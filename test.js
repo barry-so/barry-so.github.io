@@ -15,7 +15,7 @@ const timerInterval = setInterval(() => {
 }, 1000);
 
 // Fetch questions
-fetch(`https://script.google.com/macros/s/AKfycbxAyuFSNPEHAAX5zkkPrkGszTTGTfNmbBzVIKZITtGaASVu-toMylSTLvBMT1zhjxlq2g/exec=${station}`)
+fetch(`https://script.google.com/macros/s/AKfycbwE15iZDguytNunpHCitywrwZs0vIsfMuDGtmFFX9fAv_bl_-Qh3tI2Qzq-6wcoxWjFBg/exec=${station}`)
 .then(res => res.json())
 .then(data => {
   data.forEach((q, idx) => {
@@ -43,7 +43,7 @@ function submitForm() {
   data.append("email", prompt("Enter your email:"));
   new FormData(form).forEach((value, key) => data.append(key, value));
 
-  fetch("https://script.google.com/macros/s/AKfycbxAyuFSNPEHAAX5zkkPrkGszTTGTfNmbBzVIKZITtGaASVu-toMylSTLvBMT1zhjxlq2g/exec", {
+  fetch("https://script.google.com/macros/s/AKfycbwE15iZDguytNunpHCitywrwZs0vIsfMuDGtmFFX9fAv_bl_-Qh3tI2Qzq-6wcoxWjFBg/exec", {
     method: "POST",
     body: data
   })
