@@ -15,21 +15,22 @@ const timerInterval = setInterval(() => {
 }, 1000);
 
 // Fetch questions
-fetch(`https://script.google.com/macros/s/AKfycbwE15iZDguytNunpHCitywrwZs0vIsfMuDGtmFFX9fAv_bl_-Qh3tI2Qzq-6wcoxWjFBg/exec=${station}`)
-.then(res => res.json())
-.then(data => {
-  data.forEach((q, idx) => {
-    const div = document.createElement("div");
-    div.classList.add("question");
-    div.innerHTML = `<p>${q.question}</p>` +
-      (q.options.length
-        ? q.options.map(opt => `<label><input type="radio" name="q${idx+1}" value="${opt}" required> ${opt}</label>`).join("<br>")
-        : `<input type="text" name="q${idx+1}" required>`
-      );
-    form.appendChild(div);
+fetch(`https://barry-proxy2.kimethan572.workers.dev?station=${station}`)
+  .then(res => res.json())
+  .then(data => {
+    data.forEach((q, idx) => {
+      const div = document.createElement("div");
+      div.classList.add("question");
+      div.innerHTML = `<p>${q.question}</p>` +
+        (q.options.length
+          ? q.options.map(opt => `<label><input type="radio" name="q${idx+1}" value="${opt}" required> ${opt}</label>`).join("<br>")
+          : `<input type="text" name="q${idx+1}" required>`
+        );
+      form.appendChild(div);
+    });
+    form.innerHTML += '<button type="submit">Submit</button>';
   });
-  form.innerHTML += '<button type="submit">Submit</button>';
-});
+
 
 form.addEventListener("submit", e => {
   e.preventDefault();
@@ -41,9 +42,10 @@ function submitForm() {
   const data = new URLSearchParams();
   data.append("name", prompt("Enter your name:"));
   data.append("email", prompt("Enter your email:"));
+  data.append("station", station);
   new FormData(form).forEach((value, key) => data.append(key, value));
 
-  fetch("https://script.google.com/macros/s/AKfycbwE15iZDguytNunpHCitywrwZs0vIsfMuDGtmFFX9fAv_bl_-Qh3tI2Qzq-6wcoxWjFBg/exec", {
+  fetch("https://barry-proxy2.kimethan572.workers.dev/", {
     method: "POST",
     body: data
   })
