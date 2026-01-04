@@ -28,5 +28,36 @@
     <button type="submit">Send</button>
     <div id="responseMessage" class="message"></div>
   </form>
+  <script>
+    document.getElementById("contactForm").addEventListener("submit", function(e) {
+      e.preventDefault();
+      const form = e.target;
+      
+      // Build URL-encoded form data
+      const data = new URLSearchParams();
+      data.append("name", form.name.value);
+      data.append("email", form.email.value);
+      data.append("phone", form.phone.value);
+      data.append("service", form.service.value);
+      data.append("message", form.message.value);
+
+      // Send POST request with URL-encoded data
+      fetch(SCRIPT_URL, {
+        method: "POST",
+        body: data
+      })
+      .then(response => {
+        if (response.ok) {
+          document.getElementById("responseMessage").textContent = "Thank you! Your message has been sent.";
+          form.reset();
+        } else {
+          throw new Error("Network response was not ok.");
+        }
+      })
+      .catch(error => {
+        document.getElementById("responseMessage").textContent = "Error: Your message could not be sent.";
+      });
+    });
+  </script>
 </body>
 </html>
