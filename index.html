@@ -2,62 +2,20 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Contact Us</title>
+  <title>Station Test</title>
   <style>
-    body { font-family: Arial, sans-serif; padding: 20px; }
+    body { font-family: Arial; padding: 20px; }
     form { max-width: 600px; margin: auto; }
-    input, select, textarea { width: 100%; padding: 8px; margin-bottom: 10px; box-sizing: border-box; }
+    .question { margin-bottom: 15px; }
+    .options input { margin-right: 5px; }
     button { padding: 10px 20px; }
-    .message { margin-top: 20px; font-weight: bold; }
   </style>
 </head>
 <body>
-  <form id="contactForm">
-    <h2>Contact Us</h2>
-    <input type="text" name="name" placeholder="Name" required>
-    <input type="email" name="email" placeholder="Email" required>
-    <input type="tel" name="phone" placeholder="Phone" required>
-    <select name="service" required>
-      <option value="" disabled selected>Select Service</option>
-      <option value="Inspection">Inspection</option>
-      <option value="Repair">Repair</option>
-      <option value="New Construction">New Construction</option>
-      <option value="Other">Other</option>
-    </select>
-    <textarea name="message" placeholder="Message" required></textarea>
-    <button type="submit">Send</button>
-    <div id="responseMessage" class="message"></div>
-  </form>
-  <script>
-    document.getElementById("contactForm").addEventListener("submit", function(e) {
-      e.preventDefault();
-      const form = e.target;
-      
-      // Build URL-encoded form data
-      const data = new URLSearchParams();
-      data.append("name", form.name.value);
-      data.append("email", form.email.value);
-      data.append("phone", form.phone.value);
-      data.append("service", form.service.value);
-      data.append("message", form.message.value);
-
-      // Send POST request with URL-encoded data
-      fetch("https://script.google.com/macros/s/AKfycbz5mOOiBPHqhsu9QIp40Wf3IoMz7x5ogDyvP31Pctz_Hcswvpb6luYn2f0Mz9IpCc3I8Q/exec", {
-        method: "POST",
-        body: data
-      })
-      .then(response => {
-        if (response.ok) {
-          document.getElementById("responseMessage").textContent = "Thank you! Your message has been sent.";
-          form.reset();
-        } else {
-          throw new Error("Network response was not ok.");
-        }
-      })
-      .catch(error => {
-        document.getElementById("responseMessage").textContent = "Error: Your message could not be sent.";
-      });
-    });
-  </script>
+  <h2>Test Station</h2>
+  <form id="testForm"></form>
+  <div id="timer"></div>
+  <div id="result"></div>
+  <script src="test.js"></script>
 </body>
 </html>
