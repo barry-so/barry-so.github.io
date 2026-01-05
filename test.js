@@ -119,7 +119,7 @@ function loadTestList() {
 function loadCredentialsForm() {
   stopTimer();
   questionNav.style.display = "none";
-  stationTitle.textContent = "Enter Your Details (will be used on leaderboard)";
+  stationTitle.textContent = "Test Session Setup";
   form.innerHTML = `
     <div class="card credentials-section">
       <label class="block mb-4">
