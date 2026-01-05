@@ -9,12 +9,13 @@ const resultEl = document.getElementById("result");
 const stationTitle = document.getElementById("stationTitle");
 
 const STATION_TIME = 120; // 2 minutes per station
-const TOTAL_STATIONS = 1; // Update this with actual number of stations
 
 let currentStation = 0; // 0 = credentials, 1+ = actual stations
+let totalStations = 0; // Will be determined dynamically
 let timeLeft = STATION_TIME;
 let timerInterval;
 let userCredentials = { name: "", email: "" };
+let isLoading = false;
 
 // ---------------------------
 // Load Credentials Form
@@ -76,14 +77,49 @@ function formatTime(seconds) {
 }
 
 // ---------------------------
+// Show Loading Screen
+// ---------------------------
+function showLoading() {
+  isLoading = true;
+  actionButton.disabled = true;
+  form.innerHTML = '<div class="loading">Loading questions...</div>';
+  timerEl.textContent = "";
+}
+
+// ---------------------------
+// Count Total Stations
+// ---------------------------
+function countTotalStations() {
+  const maxCheck = 20;
+  const promises = [];
+  
+  for (let i = 1; i <= maxCheck; i++) {
+    promises.push(
+      fetch(`https://barry-proxy2.kimethan572.workers.dev?station=${i}`)
+        .then(res => res.json())
+        .then(data => ({ station: i, hasData: data && data.length > 0 }))
+        .catch(() => ({ station: i, hasData: false }))
+    );
+  }
+  
+  return Promise.all(promises).then(results => {
+    const stationsWithData = results.filter(r => r.hasData);
+    return stationsWithData.length > 0 ? Math.max(...stationsWithData.map(r => r.station)) : 0;
+  });
+}
+
+// ---------------------------
 // Fetch Questions from Worker
 // ---------------------------
 function loadQuestions(stationNumber) {
+  showLoading();
+  
   fetch(`https://barry-proxy2.kimethan572.workers.dev?station=${stationNumber}`)
     .then(res => res.json())
     .then(data => {
       if (!data.length) {
         form.innerHTML = "<p>No questions found for this station.</p>";
+        isLoading = false;
         return;
       }
 
@@ -113,15 +149,18 @@ function loadQuestions(stationNumber) {
         input.addEventListener("change", validateForm);
       });
 
+      isLoading = false;
+      
       // Update button state
       updateButtonState();
       validateForm();
 
-      // Start timer after questions are loaded
+      // Start timer after questions are fully loaded
       startTimer();
     })
     .catch(err => {
       form.innerHTML = `<p>Error loading questions: ${err}</p>`;
+      isLoading = false;
       console.error(err);
     });
 }
@@ -130,6 +169,11 @@ function loadQuestions(stationNumber) {
 // Validate Form
 // ---------------------------
 function validateForm() {
+  if (isLoading) {
+    actionButton.disabled = true;
+    return;
+  }
+  
   if (currentStation === 0) {
     const name = document.getElementById("nameInput")?.value.trim();
     const email = document.getElementById("emailInput")?.value.trim();
@@ -159,7 +203,7 @@ function validateForm() {
 function updateButtonState() {
   if (currentStation === 0) {
     actionButton.textContent = "Begin Test";
-  } else if (currentStation === TOTAL_STATIONS) {
+  } else if (currentStation === totalStations) {
     actionButton.textContent = "Submit Test";
   } else {
     actionButton.textContent = "Next Station";
@@ -170,19 +214,31 @@ function updateButtonState() {
 // Handle Next Station
 // ---------------------------
 function handleNextStation() {
+  if (isLoading) return;
+  
   clearInterval(timerInterval);
+  resultEl.textContent = "";
 
   if (currentStation === 0) {
     // Save credentials
     userCredentials.name = document.getElementById("nameInput").value.trim();
     userCredentials.email = document.getElementById("emailInput").value.trim();
     
-    // Move to first actual station
-    currentStation = 1;
-    stationTitle.textContent = `Test Station ${currentStation}`;
-    loadQuestions(currentStation);
-    updateButtonState();
-  } else if (currentStation < TOTAL_STATIONS) {
+    // Count total stations first, then load first station
+    countTotalStations().then(maxStation => {
+      totalStations = maxStation;
+      if (totalStations === 0) {
+        resultEl.textContent = "No stations available.";
+        return;
+      }
+      
+      // Move to first actual station
+      currentStation = 1;
+      stationTitle.textContent = `Test Station ${currentStation}`;
+      loadQuestions(currentStation);
+      updateButtonState();
+    });
+  } else if (currentStation < totalStations) {
     // Submit current station and move to next
     submitStation(currentStation, false);
     currentStation++;
@@ -216,6 +272,7 @@ function submitStation(stationNumber, isFinal) {
         resultEl.textContent = "Test completed!";
         actionButton.disabled = true;
         actionButton.textContent = "Test Submitted";
+        form.innerHTML = "";
       }
     })
     .catch(err => {
