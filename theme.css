@@ -1,13 +1,6 @@
-/* ============================================
-   High School Test-Taking Platform Theme
-   ============================================ */
-
-/* ============================================
-   COLOR PALETTE
-   ============================================ */
+/* High School Test-Taking Platform Theme */
 
 :root {
-  /* Primary Colors */
   --primary-50: #f0f9ff;
   --primary-100: #e0f2fe;
   --primary-200: #bae6fd;
@@ -19,7 +12,6 @@
   --primary-800: #075985;
   --primary-900: #0c4a6e;
 
-  /* Secondary Colors */
   --secondary-50: #f8fafc;
   --secondary-100: #f1f5f9;
   --secondary-200: #e2e8f0;
@@ -31,7 +23,6 @@
   --secondary-800: #1e293b;
   --secondary-900: #0f172a;
 
-  /* Success Colors */
   --success-50: #f0fdf4;
   --success-100: #dcfce7;
   --success-200: #bbf7d0;
@@ -43,7 +34,6 @@
   --success-800: #166534;
   --success-900: #14532d;
 
-  /* Warning Colors */
   --warning-50: #fffbeb;
   --warning-100: #fef3c7;
   --warning-200: #fde68a;
@@ -55,7 +45,6 @@
   --warning-800: #92400e;
   --warning-900: #78350f;
 
-  /* Error Colors */
   --error-50: #fef2f2;
   --error-100: #fee2e2;
   --error-200: #fecaca;
@@ -67,7 +56,6 @@
   --error-800: #991b1b;
   --error-900: #7f1d1d;
 
-  /* Neutral Colors */
   --neutral-white: #ffffff;
   --neutral-50: #fafafa;
   --neutral-100: #f5f5f5;
@@ -81,7 +69,6 @@
   --neutral-900: #171717;
   --neutral-black: #000000;
 
-  /* Semantic Color Assignments */
   --color-primary: var(--primary-600);
   --color-primary-hover: var(--primary-700);
   --color-primary-light: var(--primary-50);
@@ -99,27 +86,22 @@
   --color-border-light: var(--neutral-100);
 }
 
-/* ============================================
-   TYPOGRAPHY
-   ============================================ */
+/* Typography */
 
 :root {
-  /* Font Families */
   --font-family-primary: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
   --font-family-mono: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Fira Mono', 'Droid Sans Mono', 'Source Code Pro', monospace;
 
-  /* Font Sizes - Slightly Smaller */
-  --font-size-xs: 0.6875rem;    /* 11px */
-  --font-size-sm: 0.8125rem;    /* 13px */
-  --font-size-base: 0.9375rem;   /* 15px */
-  --font-size-lg: 1.0625rem;     /* 17px */
-  --font-size-xl: 1.1875rem;     /* 19px */
-  --font-size-2xl: 1.375rem;     /* 22px */
-  --font-size-3xl: 1.75rem;      /* 28px */
-  --font-size-4xl: 2.0625rem;    /* 33px */
-  --font-size-5xl: 2.75rem;      /* 44px */
+  --font-size-xs: 0.6875rem;
+  --font-size-sm: 0.8125rem;
+  --font-size-base: 0.9375rem;
+  --font-size-lg: 1.0625rem;
+  --font-size-xl: 1.1875rem;
+  --font-size-2xl: 1.375rem;
+  --font-size-3xl: 1.75rem;
+  --font-size-4xl: 2.0625rem;
+  --font-size-5xl: 2.75rem;
 
-  /* Font Weights */
   --font-weight-light: 300;
   --font-weight-normal: 400;
   --font-weight-medium: 500;
@@ -127,20 +109,17 @@
   --font-weight-bold: 700;
   --font-weight-extrabold: 800;
 
-  /* Line Heights */
   --line-height-tight: 1.25;
   --line-height-normal: 1.5;
   --line-height-relaxed: 1.75;
   --line-height-loose: 2;
 
-  /* Letter Spacing */
   --letter-spacing-tight: -0.025em;
   --letter-spacing-normal: 0;
   --letter-spacing-wide: 0.025em;
   --letter-spacing-wider: 0.05em;
 }
 
-/* Typography Base Styles */
 body {
   font-family: var(--font-family-primary);
   font-size: var(--font-size-base);
@@ -228,28 +207,24 @@ h6, .h6 {
 .text-warning { color: var(--color-warning); }
 .text-error { color: var(--color-error); }
 
-/* ============================================
-   SPACING SYSTEM
-   ============================================ */
+/* Spacing */
 
 :root {
   --spacing-0: 0;
-  --spacing-1: 0.25rem;    /* 4px */
-  --spacing-2: 0.5rem;     /* 8px */
-  --spacing-3: 0.75rem;    /* 12px */
-  --spacing-4: 1rem;       /* 16px */
-  --spacing-5: 1.25rem;    /* 20px */
-  --spacing-6: 1.5rem;     /* 24px */
-  --spacing-8: 2rem;       /* 32px */
-  --spacing-10: 2.5rem;    /* 40px */
-  --spacing-12: 3rem;      /* 48px */
-  --spacing-16: 4rem;      /* 64px */
-  --spacing-20: 5rem;      /* 80px */
-  --spacing-24: 6rem;      /* 96px */
-  --spacing-32: 8rem;      /* 128px */
+  --spacing-1: 0.25rem;
+  --spacing-2: 0.5rem;
+  --spacing-3: 0.75rem;
+  --spacing-4: 1rem;
+  --spacing-5: 1.25rem;
+  --spacing-6: 1.5rem;
+  --spacing-8: 2rem;
+  --spacing-10: 2.5rem;
+  --spacing-12: 3rem;
+  --spacing-16: 4rem;
+  --spacing-20: 5rem;
+  --spacing-24: 6rem;
+  --spacing-32: 8rem;
 }
-
-/* Spacing Utility Classes */
 .m-0 { margin: var(--spacing-0); }
 .m-1 { margin: var(--spacing-1); }
 .m-2 { margin: var(--spacing-2); }
@@ -399,15 +374,13 @@ h6, .h6 {
 .py-10 { padding-top: var(--spacing-10); padding-bottom: var(--spacing-10); }
 .py-12 { padding-top: var(--spacing-12); padding-bottom: var(--spacing-12); }
 
-/* ============================================
-   CARD STYLES
-   ============================================ */
+/* Cards */
 
 :root {
   --card-padding: var(--spacing-6);
-  --card-border-radius: 0;      /* 0px - boxy */
-  --card-border-radius-sm: 0;    /* 0px - boxy */
-  --card-border-radius-lg: 0;       /* 0px - boxy */
+  --card-border-radius: 0;
+  --card-border-radius-sm: 0;
+  --card-border-radius-lg: 0;
   --card-shadow-sm: 0 2px 0 0 rgba(0, 0, 0, 0.1);
   --card-shadow: 0 2px 0 0 rgba(0, 0, 0, 0.15), 0 4px 0 0 rgba(0, 0, 0, 0.1);
   --card-shadow-md: 0 3px 0 0 rgba(0, 0, 0, 0.2), 0 6px 0 0 rgba(0, 0, 0, 0.15);
@@ -417,7 +390,6 @@ h6, .h6 {
   --card-border-color: var(--color-border);
 }
 
-/* Base Card */
 .card {
   background-color: var(--color-background);
   border: var(--card-border-width) solid var(--card-border-color);
@@ -431,7 +403,6 @@ h6, .h6 {
   box-shadow: var(--card-shadow-md);
 }
 
-/* Card Variants */
 .card-elevated {
   box-shadow: var(--card-shadow-lg);
   border: none;
@@ -469,7 +440,6 @@ h6, .h6 {
   box-shadow: var(--card-shadow);
 }
 
-/* Card Sizes */
 .card-sm {
   padding: var(--spacing-4);
   border-radius: var(--card-border-radius-sm);
@@ -480,7 +450,6 @@ h6, .h6 {
   border-radius: var(--card-border-radius-lg);
 }
 
-/* Card Header */
 .card-header {
   padding-bottom: var(--spacing-4);
   margin-bottom: var(--spacing-4);
@@ -496,7 +465,6 @@ h6, .h6 {
   margin: 0;
 }
 
-/* Card Body */
 .card-body {
   padding: 0;
 }
@@ -509,14 +477,12 @@ h6, .h6 {
   padding-bottom: 0;
 }
 
-/* Card Footer */
 .card-footer {
   padding-top: var(--spacing-4);
   margin-top: var(--spacing-4);
   border-top: 2px solid var(--color-border);
 }
 
-/* Card with Image */
 .card-image {
   width: 100%;
   height: auto;
@@ -524,9 +490,7 @@ h6, .h6 {
   margin: calc(var(--card-padding) * -1) calc(var(--card-padding) * -1) var(--spacing-4) calc(var(--card-padding) * -1);
 }
 
-/* ============================================
-   ADDITIONAL UTILITIES
-   ============================================ */
+/* Utilities */
 
 /* Border Radius */
 .rounded-none { border-radius: 0; }
@@ -591,13 +555,11 @@ h6, .h6 {
 .bg-gray-50 { background-color: var(--neutral-50); }
 .bg-gray-100 { background-color: var(--neutral-100); }
 
-/* ============================================
-   QUESTION CARD STYLES
-   ============================================ */
+/* Question Cards */
 
 :root {
   --question-card-padding: var(--spacing-6);
-  --question-card-border-radius: 0;      /* 0px - boxy */
+  --question-card-border-radius: 0;
   --question-card-gap: var(--spacing-5);
   --question-card-border: 2px solid var(--color-border);
   --question-card-bg: var(--neutral-white);
@@ -605,11 +567,9 @@ h6, .h6 {
   --question-card-shadow-hover: var(--card-shadow-md);
   --question-number-size: 2rem;
   --option-padding: var(--spacing-4);
-  --option-border-radius: 0;               /* 0px - boxy */
+  --option-border-radius: 0;
   --option-gap: var(--spacing-3);
 }
-
-/* Base Question Card Container */
 .question {
   background-color: var(--question-card-bg);
   border: var(--question-card-border);
@@ -952,29 +912,56 @@ button.bg-primary:hover:not(:disabled) {
   left: 0;
   right: 0;
   background-color: var(--neutral-100);
-  padding: var(--spacing-4);
-  text-align: center;
-  font-size: var(--font-size-xs);
-  color: var(--color-text-secondary);
   border-top: 3px solid var(--color-border);
   z-index: 50;
+  height: clamp(3.5rem, 8vh, 5rem);
+  max-height: 5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--spacing-4);
+  overflow: hidden;
 }
 
 .footer-content {
   max-width: 48rem;
+  width: 100%;
   margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(0.125rem, 0.5vh, 0.25rem);
+  text-align: center;
+  font-size: clamp(0.625rem, 1.5vw, 0.8125rem);
+  line-height: 1.2;
+  color: var(--color-text-secondary);
+  padding: clamp(0.25rem, 0.5vh, 0.5rem) 0;
+}
+
+.footer-content > *:first-child {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .footer-help-text {
-  margin-top: var(--spacing-1);
-  display: block;
+  font-size: clamp(0.5rem, 1.2vw, 0.625rem);
+  line-height: 1.1;
+  opacity: 0.85;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .footer a {
   color: var(--color-primary);
   text-decoration: none;
-  margin: 0 var(--spacing-2);
+  margin: 0 clamp(0.25rem, 0.5vw, 0.5rem);
   transition: color 0.2s ease-in-out;
+  white-space: nowrap;
 }
 
 .footer a:hover {
@@ -983,19 +970,7 @@ button.bg-primary:hover:not(:disabled) {
 }
 
 body {
-  padding-bottom: 120px;
-}
-
-@media (max-width: 768px) {
-  body {
-    padding-bottom: 80px;
-  }
-}
-
-@media (max-width: 480px) {
-  body {
-    padding-bottom: 60px;
-  }
+  padding-bottom: clamp(3.5rem, 8vh, 5rem);
 }
 
 /* ============================================
@@ -1229,9 +1204,7 @@ body {
   box-shadow: 0 0 0 2px var(--primary-200);
 }
 
-/* ============================================
-   NAVIGATION BAR - QUESTION NAVIGATOR
-   ============================================ */
+/* Question Navigator */
 
 :root {
   --nav-bar-height: 4rem;
@@ -1589,9 +1562,7 @@ body {
   outline: none;
 }
 
-/* ============================================
-   LOADING SCREENS - ANIMATED TRANSITIONS
-   ============================================ */
+/* Loading Screens */
 
 :root {
   --loading-container-padding: var(--spacing-12);
@@ -1624,9 +1595,7 @@ body {
   50% { opacity: 1; }
 }
 
-/* ============================================
-   BARRY THE BEE LOADING
-   ============================================ */
+/* Barry Bee Loading */
 
 .loading-barry {
   position: relative;
@@ -1738,9 +1707,7 @@ body {
   100% { opacity: 0; transform: scale(0.5); }
 }
 
-/* ============================================
-   BIRD LOADING
-   ============================================ */
+/* Bird Loading */
 
 .loading-bird {
   position: relative;
@@ -1826,9 +1793,7 @@ body {
   50% { transform: rotate(-10deg); }
 }
 
-/* ============================================
-   LIZARD LOADING
-   ============================================ */
+/* Lizard Loading */
 
 .loading-lizard {
   position: relative;
@@ -1937,9 +1902,7 @@ body {
   95% { opacity: 0; }
 }
 
-/* ============================================
-   BUG/ANT LOADING
-   ============================================ */
+/* Bug Loading */
 
 .loading-bug {
   position: relative;
@@ -2044,9 +2007,7 @@ body {
   50% { transform: rotate(10deg); }
 }
 
-/* ============================================
-   FOSSIL/ROCK LOADING
-   ============================================ */
+/* Fossil Loading */
 
 .loading-fossil {
   position: relative;
@@ -2139,9 +2100,7 @@ body {
   }
 }
 
-/* ============================================
-   ROCK LOADING
-   ============================================ */
+/* Rock Loading */
 
 .loading-rock {
   position: relative;
@@ -2209,9 +2168,7 @@ body {
   50% { transform: translate(3px, 2px); }
 }
 
-/* ============================================
-   LOADING SCREEN VARIATIONS
-   ============================================ */
+/* Loading Screen Variations */
 
 .loading-screen.barry-theme {
   background: linear-gradient(135deg, var(--warning-50) 0%, var(--neutral-white) 100%);
@@ -2296,11 +2253,8 @@ body {
   }
 }
 
-/* ============================================
-   RESPONSIVE LAYOUTS - MOBILE & TABLET
-   ============================================ */
+/* Responsive Layouts */
 
-/* Breakpoint Variables */
 :root {
   --breakpoint-sm: 480px;
   --breakpoint-md: 768px;
@@ -2309,7 +2263,6 @@ body {
   --breakpoint-2xl: 1536px;
 }
 
-/* Base Mobile Optimizations */
 * {
   box-sizing: border-box;
 }
@@ -2328,14 +2281,11 @@ body {
   font-size: 0.9375rem; /* 15px - slightly smaller */
 }
 
-/* Header positioning - move closer to top */
 header {
   margin-top: calc(var(--spacing-4) * -1);
 }
 
-/* ============================================
-   SIDEBAR & HAMBURGER MENU
-   ============================================ */
+/* Sidebar & Hamburger Menu */
 
 .hamburger-menu {
   position: fixed;
@@ -2746,51 +2696,28 @@ header {
   }
 }
 
-/* Mobile Footer */
+/* Mobile Footer - Footer size is fixed, fonts scale automatically via clamp */
 @media (max-width: 768px) {
   .footer {
-    padding: var(--spacing-2) var(--spacing-3);
-    font-size: var(--font-size-xs);
-    line-height: 1.3;
+    height: clamp(3rem, 6vh, 4rem);
+    max-height: 4rem;
+    padding: 0 var(--spacing-2);
   }
 
   .footer-content {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-1);
-    align-items: center;
-  }
-
-  .footer-content > * {
-    line-height: 1.4;
-  }
-
-  .footer a {
-    display: inline;
-    margin: 0;
-  }
-
-  .footer .text-sm {
-    font-size: 0.625rem;
-    line-height: 1.3;
-    margin-top: var(--spacing-1);
-    text-align: center;
+    gap: clamp(0.125rem, 0.3vh, 0.2rem);
   }
 }
 
 @media (max-width: 480px) {
   .footer {
-    padding: var(--spacing-1) var(--spacing-2);
-    font-size: 0.625rem;
+    height: clamp(2.5rem, 5vh, 3.5rem);
+    max-height: 3.5rem;
+    padding: 0 var(--spacing-2);
   }
 
   .footer-content {
-    gap: 0.25rem;
-  }
-
-  .footer .text-sm {
-    font-size: 0.5625rem;
-    margin-top: 0.25rem;
+    gap: 0.125rem;
   }
 }
 
@@ -2838,11 +2765,8 @@ header {
   }
 }
 
-/* ============================================
-   HIGH-CONTRAST MODE
-   ============================================ */
+/* High Contrast Mode */
 
-/* High Contrast Color Variables */
 :root {
   --hc-bg: #ffffff;
   --hc-text: #000000;
@@ -2855,7 +2779,6 @@ header {
   --hc-error: #cc0000;
 }
 
-/* High Contrast Mode Detection */
 @media (prefers-contrast: high) {
   :root {
     --color-background: var(--hc-bg);
@@ -3039,11 +2962,8 @@ header {
   outline-offset: 2px;
 }
 
-/* ============================================
-   KEYBOARD NAVIGATION CUES
-   ============================================ */
+/* Keyboard Navigation */
 
-/* Skip to Main Content Link */
 .skip-link {
   position: absolute;
   top: -100px;
@@ -3064,19 +2984,16 @@ header {
   outline-offset: 2px;
 }
 
-/* Enhanced Focus Indicators */
 *:focus-visible {
   outline: 3px solid var(--color-primary);
   outline-offset: 2px;
   border-radius: 2px;
 }
 
-/* Remove default focus for mouse users */
 *:focus:not(:focus-visible) {
   outline: none;
 }
 
-/* Interactive Element Focus Styles */
 button:focus-visible,
 a:focus-visible,
 input:focus-visible,
@@ -3089,7 +3006,6 @@ textarea:focus-visible,
   box-shadow: 0 0 0 1px var(--color-background);
 }
 
-/* Radio and Checkbox Focus */
 input[type="radio"]:focus-visible,
 input[type="checkbox"]:focus-visible {
   outline: 3px solid var(--color-primary);
@@ -3097,14 +3013,12 @@ input[type="checkbox"]:focus-visible {
   border-radius: 50%;
 }
 
-/* Focus Ring for Cards */
 .card:focus-visible,
 .question:focus-visible {
   outline: 3px solid var(--color-primary);
   outline-offset: 3px;
 }
 
-/* Keyboard Navigation Indicator */
 .keyboard-user *:focus-visible {
   outline-width: 3px;
   outline-style: solid;
@@ -3115,7 +3029,6 @@ input[type="checkbox"]:focus-visible {
   outline: none;
 }
 
-/* Focus Trap Indicator */
 .focus-trap {
   position: relative;
 }
@@ -3138,7 +3051,6 @@ input[type="checkbox"]:focus-visible {
   opacity: 1;
 }
 
-/* Tab Order Visual Indicator (Development Only) */
 .tab-order-indicator {
   position: relative;
 }
@@ -3161,7 +3073,6 @@ input[type="checkbox"]:focus-visible {
   z-index: 10;
 }
 
-/* Keyboard Shortcuts Help */
 .keyboard-shortcuts {
   position: fixed;
   bottom: var(--spacing-4);
@@ -3210,7 +3121,6 @@ input[type="checkbox"]:focus-visible {
   text-align: center;
 }
 
-/* ARIA Live Regions for Screen Readers */
 .sr-only {
   position: absolute;
   width: 1px;
@@ -3234,7 +3144,6 @@ input[type="checkbox"]:focus-visible {
   white-space: normal;
 }
 
-/* Screen Reader Announcements */
 [role="status"],
 [role="alert"],
 .aria-live {
@@ -3245,9 +3154,7 @@ input[type="checkbox"]:focus-visible {
   overflow: hidden;
 }
 
-/* Mobile Keyboard Navigation Improvements */
 @media (max-width: 768px) {
-  /* Larger touch targets for keyboard navigation */
   button,
   a,
   .question-nav-item,
@@ -3256,14 +3163,12 @@ input[type="checkbox"]:focus-visible {
     min-width: 44px;
   }
 
-  /* Enhanced mobile focus */
   *:focus-visible {
     outline-width: 4px;
     outline-offset: 4px;
   }
 }
 
-/* Reduced Motion for Focus Indicators */
 @media (prefers-reduced-motion: reduce) {
   *:focus-visible {
     transition: none;
@@ -3274,7 +3179,6 @@ input[type="checkbox"]:focus-visible {
   }
 }
 
-/* High Contrast Focus in High Contrast Mode */
 @media (prefers-contrast: high) {
   *:focus-visible {
     outline: 4px solid var(--hc-focus);
