@@ -37,6 +37,76 @@ let lastPageLeaveTime = null; // When user last left the page
 const loadingThemes = ['barry-theme', 'bird-theme', 'lizard-theme', 'bug-theme', 'fossil-theme', 'rock-theme'];
 
 // ---------------------------
+// Parse and Render Images in Question Text
+// ---------------------------
+function parseImagesInQuestion(questionText, questionNum) {
+  // Pattern to match data URIs (data:image/...)
+  const dataUriPattern = /(data:image\/[^;]+;base64,[^\s<>"']+)/gi;
+  // Pattern to match image URLs (http/https URLs ending with image extensions or containing image paths)
+  const urlPattern = /(https?:\/\/[^\s<>"']+\.(jpg|jpeg|png|gif|webp|svg|bmp)(\?[^\s<>"']*)?)/gi;
+  
+  let processedText = questionText;
+  let imageCounter = 0;
+  
+  // Replace data URIs
+  processedText = processedText.replace(dataUriPattern, (match) => {
+    imageCounter++;
+    const imageId = `img-${questionNum}-${Date.now()}-${imageCounter}`;
+    return createImageHTML(match, imageId, questionNum, true);
+  });
+  
+  // Replace regular image URLs
+  processedText = processedText.replace(urlPattern, (match) => {
+    imageCounter++;
+    const imageId = `img-${questionNum}-${Date.now()}-${imageCounter}`;
+    return createImageHTML(match, imageId, questionNum, false);
+  });
+  
+  return processedText;
+}
+
+function createImageHTML(imageUrl, imageId, questionNum, isDataUri) {
+  const corsAttrs = isDataUri ? '' : 'crossorigin="anonymous" referrerpolicy="no-referrer"';
+  const errorMsg = isDataUri 
+    ? 'The image data may be invalid or corrupted.' 
+    : 'The image may be blocked by CORS restrictions, unavailable, or the URL may be invalid.';
+  
+  // Use eager loading for question images since they should load immediately
+  // Also handle both onload and check complete property for reliability
+  return `
+    <div class="question-image-container" id="${imageId}">
+      <img class="question-image" 
+           src="${imageUrl}" 
+           alt="Question ${questionNum} image" 
+           ${corsAttrs}
+           loading="eager"
+           style="display: none;"
+           onload="handleImageLoad(this)"
+           onerror="handleImageError(this)">
+      <div class="image-loading">Loading image...</div>
+      <div class="image-error" style="display: none;">Failed to load image. ${errorMsg}</div>
+    </div>`;
+}
+
+function handleImageLoad(img) {
+  img.style.display = 'block';
+  const container = img.parentElement;
+  const loading = container.querySelector('.image-loading');
+  const error = container.querySelector('.image-error');
+  if (loading) loading.style.display = 'none';
+  if (error) error.style.display = 'none';
+}
+
+function handleImageError(img) {
+  img.style.display = 'none';
+  const container = img.parentElement;
+  const loading = container.querySelector('.image-loading');
+  const error = container.querySelector('.image-error');
+  if (loading) loading.style.display = 'none';
+  if (error) error.style.display = 'block';
+}
+
+// ---------------------------
 // Load Test List
 // ---------------------------
 function loadTestList() {
@@ -816,6 +886,10 @@ function restoreAnswers() {
         input.value = answers[questionName];
         // Trigger input event to update state
         input.dispatchEvent(new Event('input', { bubbles: true }));
+      } else if (input.tagName === 'TEXTAREA') {
+        input.value = answers[questionName];
+        // Trigger input event to update state
+        input.dispatchEvent(new Event('input', { bubbles: true }));
       }
     }
   });
@@ -879,6 +953,52 @@ function trackQuestionStates() {
           
           // Save answer
           saveAnswer(`q${num}`, textInput.value);
+          
+          // Update last answered question
+          if (num > lastAnsweredQuestion) {
+            lastAnsweredQuestion = num;
+          }
+        } else {
+          // Remove answered state but keep marked/skipped
+          if (currentState === 'answered') {
+            questionStates[num] = 'default';
+          } else if (currentState === 'answered-marked') {
+            questionStates[num] = 'marked';
+          } else if (currentState === 'answered-skipped') {
+            questionStates[num] = 'skipped';
+          } else if (currentState === 'answered-skipped-marked') {
+            questionStates[num] = 'skipped-marked';
+          }
+          
+          // Remove saved answer
+          if (savedAnswers[currentStation] && savedAnswers[currentStation][`q${num}`]) {
+            delete savedAnswers[currentStation][`q${num}`];
+            saveTestState();
+          }
+        }
+        updateQuestionNavigation();
+      });
+    }
+
+    // Check for textarea (FRQ questions)
+    const textarea = questionDiv.querySelector('textarea');
+    if (textarea) {
+      textarea.addEventListener('input', () => {
+        const currentState = questionStates[num] || 'default';
+        if (textarea.value.trim()) {
+          if (currentState.includes('marked')) {
+            questionStates[num] = 'answered-marked';
+          } else if (currentState.includes('skipped')) {
+            questionStates[num] = 'answered-skipped';
+            if (currentState.includes('marked')) {
+              questionStates[num] = 'answered-skipped-marked';
+            }
+          } else {
+            questionStates[num] = 'answered';
+          }
+          
+          // Save answer
+          saveAnswer(`q${num}`, textarea.value);
           
           // Update last answered question
           if (num > lastAnsweredQuestion) {
@@ -1001,29 +1121,8 @@ async function loadQuestions(stationNumber) {
         div.id = `question-${num}`;
         div.setAttribute('data-question-number', num);
 
-        // Build question HTML with image inline if provided
-        let questionHTML = q.question;
-        if (q.imageUrl) {
-          const imageId = `img-${num}-${Date.now()}`;
-          const isDataUri = q.imageUrl.startsWith('data:');
-          // For data URIs, don't use CORS attributes as they're not needed
-          // For external URLs, try with CORS but it may still fail if server doesn't allow it
-          const corsAttrs = isDataUri ? '' : 'crossorigin="anonymous" referrerpolicy="no-referrer"';
-          
-          questionHTML += `
-            <div class="question-image-container" id="${imageId}">
-              <img class="question-image" 
-                   src="${q.imageUrl}" 
-                   alt="Question ${num} image" 
-                   ${corsAttrs}
-                   loading="lazy"
-                   style="display: none;"
-                   onload="this.style.display='block'; const container=this.parentElement; const loading=container.querySelector('.image-loading'); if(loading) loading.style.display='none'; const error=container.querySelector('.image-error'); if(error) error.style.display='none';"
-                   onerror="this.style.display='none'; const container=this.parentElement; const loading=container.querySelector('.image-loading'); if(loading) loading.style.display='none'; const error=container.querySelector('.image-error'); if(error) error.style.display='block';">
-              <div class="image-loading">Loading image...</div>
-              <div class="image-error" style="display: none;">Failed to load image. ${isDataUri ? 'The image data may be invalid or corrupted.' : 'The image may be blocked by CORS restrictions, unavailable, or the URL may be invalid.'}</div>
-            </div>`;
-        }
+        // Parse question text and render any images found inline
+        const questionHTML = parseImagesInQuestion(q.question, num);
 
         const questionContent = document.createElement('div');
         questionContent.classList.add('question-content');
@@ -1034,7 +1133,19 @@ async function loadQuestions(stationNumber) {
 
         div.appendChild(questionContent);
 
-        if (q.options.length) {
+        // Check if options is "frq" (either as string or array with "frq")
+        const isFRQ = q.options === "frq" || (Array.isArray(q.options) && q.options.length === 1 && q.options[0] === "frq");
+        
+        if (isFRQ) {
+          // Create textarea for Free Response Question
+          const textarea = document.createElement('textarea');
+          textarea.name = `q${num}`;
+          textarea.placeholder = 'Enter your answer';
+          textarea.rows = 6;
+          textarea.classList.add('frq-textarea');
+          div.appendChild(textarea);
+        } else if (Array.isArray(q.options) && q.options.length) {
+          // Create radio buttons for multiple choice
           q.options.forEach(opt => {
             const label = document.createElement('label');
             label.innerHTML = `<input type="radio" name="q${num}" value="${opt}"> ${opt}`;
@@ -1054,6 +1165,18 @@ async function loadQuestions(stationNumber) {
 
         form.appendChild(div);
       });
+
+      // Check for images that may have already loaded (especially data URIs)
+      // This handles cases where onload might not fire due to browser optimizations
+      setTimeout(() => {
+        const images = form.querySelectorAll('.question-image');
+        images.forEach(img => {
+          if (img.complete && img.naturalHeight !== 0) {
+            // Image already loaded
+            handleImageLoad(img);
+          }
+        });
+      }, 100);
 
       trackQuestionStates();
       
@@ -1319,14 +1442,16 @@ async function handleNextStation(isAutoAdvance=false) {
     updateButtonState();
 
   } else {
-    // Final submission - show warning
-    const warningMessage = `Are you sure you want to submit the test?\n\n` +
-      `This will submit all your answers and you will not be able to make any changes.\n\n` +
-      `Please review your answers before submitting.`;
-    
-    if (!confirm(warningMessage)) {
-      startTimer();
-      return;
+    // Final submission - show warning only if not auto-advancing
+    if (!isAutoAdvance) {
+      const warningMessage = `Are you sure you want to submit the test?\n\n` +
+        `This will submit all your answers and you will not be able to make any changes.\n\n` +
+        `Please review your answers before submitting.`;
+      
+      if (!confirm(warningMessage)) {
+        startTimer();
+        return;
+      }
     }
     
     await submitStation(currentStation, true);
