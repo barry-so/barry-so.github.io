@@ -518,6 +518,51 @@ function getLoadingScreenHTML(theme) {
       </div>
       <div class="loading-message">Loading questions...</div>
     `;
+  } else if (theme === 'bug-theme') {
+    return `
+      <div class="loading-bug">
+        <div class="bug">
+          <div class="bug-body">
+            <div class="bug-segment"></div>
+            <div class="bug-segment"></div>
+            <div class="bug-segment"></div>
+            <div class="bug-leg left"></div>
+            <div class="bug-leg left"></div>
+            <div class="bug-leg right"></div>
+            <div class="bug-leg right"></div>
+            <div class="bug-antenna left"></div>
+            <div class="bug-antenna right"></div>
+          </div>
+        </div>
+      </div>
+      <div class="loading-message">Loading questions...</div>
+    `;
+  } else if (theme === 'fossil-theme') {
+    return `
+      <div class="loading-fossil">
+        <div class="fossil">
+          <div class="fossil-rock">
+            <div class="fossil-pattern"></div>
+            <div class="fossil-sparkle"></div>
+            <div class="fossil-sparkle"></div>
+            <div class="fossil-sparkle"></div>
+          </div>
+        </div>
+      </div>
+      <div class="loading-message">Loading questions...</div>
+    `;
+  } else if (theme === 'rock-theme') {
+    return `
+      <div class="loading-rock">
+        <div class="rock">
+          <div class="rock-body">
+            <div class="rock-highlight"></div>
+            <div class="rock-texture"></div>
+          </div>
+        </div>
+      </div>
+      <div class="loading-message">Loading questions...</div>
+    `;
   } else {
     return `<div class="loading-message">Loading questions...</div>`;
   }
