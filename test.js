@@ -33,7 +33,7 @@ let savedAnswers = {}; // Saved answers by station
 let totalOutOfBrowserTime = 0; // Total time spent out of browser (in seconds)
 let lastPageLeaveTime = null; // When user last left the page
 
-// Loading screen themes
+// Loading screen themes lol they balls
 const loadingThemes = ['barry-theme', 'bird-theme', 'lizard-theme', 'bug-theme', 'fossil-theme', 'rock-theme'];
 
 // ---------------------------
@@ -123,6 +123,17 @@ function loadCredentialsForm() {
           </div>
         `;
         actionButton.disabled = true;
+        // Clear any saved state for this completed test if IP is available
+        if (userIP) {
+          const tempStateKey = `test_state_${userIP}_${test}`;
+          try {
+            if (localStorage.getItem(tempStateKey)) {
+              localStorage.removeItem(tempStateKey);
+            }
+          } catch (err) {
+            console.error('Failed to clear state:', err);
+          }
+        }
         return;
       } else {
         // Clear any previous error messages
@@ -196,6 +207,14 @@ function getCompletionKey(testName) {
 // Check if Test is Completed
 // ---------------------------
 function isTestCompleted(testName) {
+  // If IP is not available, we cannot check completion - assume not completed for safety
+  // but this should not happen in normal flow as IP should be loaded first
+  if (!userIP || !testName) {
+    // If we're checking but IP isn't ready, wait for it
+    // This is a safety check - in practice, IP should be loaded before this is called
+    return false;
+  }
+  
   const completionKey = getCompletionKey(testName);
   if (!completionKey) return false;
   
@@ -892,7 +911,41 @@ function trackQuestionStates() {
 // ---------------------------
 // Load Questions
 // ---------------------------
-function loadQuestions(stationNumber) {
+async function loadQuestions(stationNumber) {
+  // CRITICAL: Ensure IP is available and check if test is completed before loading any questions
+  if (userCredentials.test) {
+    // Ensure IP is loaded
+    if (!userIP) {
+      await getUserIP();
+    }
+    
+    if (isTestCompleted(userCredentials.test)) {
+      // Test is completed - prevent loading questions
+      stopTimer();
+      questionNav.style.display = "none";
+      form.innerHTML = `
+        <div class="card" style="background-color: var(--error-50); border: 2px solid var(--color-error);">
+          <div class="text-center">
+            <div class="text-4xl mb-4">⚠️</div>
+            <h3 class="text-error mb-3" style="font-size: var(--font-size-xl); font-weight: var(--font-weight-bold);">
+              You cannot access this test!
+            </h3>
+            <p class="text-base mb-2" style="color: var(--color-text-primary);">
+              This test has already been completed. You cannot retake it.
+            </p>
+          </div>
+        </div>
+      `;
+      actionButton.style.display = "none";
+      timerEl.textContent = "";
+      stationTitle.textContent = "Test Access Denied";
+      isLoading = false;
+      // Clear any saved state for this completed test
+      clearTestState();
+      return;
+    }
+  }
+  
   showLoading();
 
   fetch(`https://barry-proxy2.kimethan572.workers.dev?test=${userCredentials.test}&station=${stationNumber}`)
@@ -948,12 +1001,51 @@ function loadQuestions(stationNumber) {
         div.id = `question-${num}`;
         div.setAttribute('data-question-number', num);
 
+        // Build question HTML with image inline if provided
+        let questionHTML = q.question;
+        if (q.imageUrl) {
+          const imageId = `img-${num}-${Date.now()}`;
+          const isDataUri = q.imageUrl.startsWith('data:');
+          // For data URIs, don't use CORS attributes as they're not needed
+          // For external URLs, try with CORS but it may still fail if server doesn't allow it
+          const corsAttrs = isDataUri ? '' : 'crossorigin="anonymous" referrerpolicy="no-referrer"';
+          
+          questionHTML += `
+            <div class="question-image-container" id="${imageId}">
+              <img class="question-image" 
+                   src="${q.imageUrl}" 
+                   alt="Question ${num} image" 
+                   ${corsAttrs}
+                   loading="lazy"
+                   style="display: none;"
+                   onload="this.style.display='block'; const container=this.parentElement; const loading=container.querySelector('.image-loading'); if(loading) loading.style.display='none'; const error=container.querySelector('.image-error'); if(error) error.style.display='none';"
+                   onerror="this.style.display='none'; const container=this.parentElement; const loading=container.querySelector('.image-loading'); if(loading) loading.style.display='none'; const error=container.querySelector('.image-error'); if(error) error.style.display='block';">
+              <div class="image-loading">Loading image...</div>
+              <div class="image-error" style="display: none;">Failed to load image. ${isDataUri ? 'The image data may be invalid or corrupted.' : 'The image may be blocked by CORS restrictions, unavailable, or the URL may be invalid.'}</div>
+            </div>`;
+        }
+
+        const questionContent = document.createElement('div');
+        questionContent.classList.add('question-content');
+        
+        const questionText = document.createElement('p');
+        questionText.innerHTML = questionHTML;
+        questionContent.appendChild(questionText);
+
+        div.appendChild(questionContent);
+
         if (q.options.length) {
-          div.innerHTML = `<p>${q.question}</p>` + q.options.map(opt =>
-            `<label><input type="radio" name="q${num}" value="${opt}"> ${opt}</label>`
-          ).join("");
+          q.options.forEach(opt => {
+            const label = document.createElement('label');
+            label.innerHTML = `<input type="radio" name="q${num}" value="${opt}"> ${opt}`;
+            div.appendChild(label);
+          });
         } else {
-          div.innerHTML = `<p>${q.question}</p><input type="text" name="q${num}" placeholder="Enter your answer">`;
+          const textInput = document.createElement('input');
+          textInput.type = 'text';
+          textInput.name = `q${num}`;
+          textInput.placeholder = 'Enter your answer';
+          div.appendChild(textInput);
         }
 
         // Add bookmark icon
@@ -991,17 +1083,17 @@ function loadQuestions(stationNumber) {
           showTimeExpiredMessage();
           
           // Small delay to show message before advancing
-          setTimeout(() => {
+          setTimeout(async () => {
             if (currentStation < totalStations) {
-              submitStation(currentStation, false);
+              await submitStation(currentStation, false);
               currentStation++;
               stationTitle.textContent = `Test Station ${currentStation} of ${totalStations}`;
               timerStartTime = null; // Reset for new station
-              loadQuestions(currentStation);
+              await loadQuestions(currentStation);
               updateButtonState();
             } else {
               // Last station - submit final
-              submitStation(currentStation, true);
+              await submitStation(currentStation, true);
             }
           }, 1500);
           return; // Don't start timer, we're advancing
@@ -1101,12 +1193,36 @@ async function handleNextStation(isAutoAdvance=false) {
       `;
       isLoading = false;
       actionButton.disabled = false;
+      // Clear any saved state for this completed test
+      clearTestState();
       return;
     }
     
     // Check for existing state for this test
     const savedState = loadTestState();
     if (savedState && savedState.userCredentials.test === userCredentials.test) {
+      // Double-check that the test is not completed before restoring state
+      if (isTestCompleted(savedState.userCredentials.test)) {
+        // Test is completed - clear state and show error
+        clearTestState();
+        resultEl.className = "text-center mt-6 mb-6";
+        resultEl.innerHTML = `
+          <div class="card" style="background-color: var(--error-50); border: 2px solid var(--color-error);">
+            <div class="text-center">
+              <div class="text-4xl mb-4">⚠️</div>
+              <h3 class="text-error mb-3" style="font-size: var(--font-size-xl); font-weight: var(--font-weight-bold);">
+                You cannot repeat this test!
+              </h3>
+              <p class="text-base mb-2" style="color: var(--color-text-primary);">
+                This test has already been completed. Please select a different test.
+              </p>
+            </div>
+          </div>
+        `;
+        isLoading = false;
+        actionButton.disabled = false;
+        return;
+      }
       // Restore from saved state
       currentStation = savedState.currentStation || 1;
       totalStations = savedState.totalStations || 0;
@@ -1137,11 +1253,35 @@ async function handleNextStation(isAutoAdvance=false) {
         }
         
         stationTitle.textContent = `Test Station ${currentStation} of ${totalStations}`;
-        loadQuestions(currentStation);
-        updateButtonState();
+        loadQuestions(currentStation).then(() => {
+          updateButtonState();
+        });
       });
     } else {
       // New test - start fresh
+      // Double-check that the test is not completed before starting
+      if (isTestCompleted(userCredentials.test)) {
+        // Test is completed - show error
+        clearTestState();
+        resultEl.className = "text-center mt-6 mb-6";
+        resultEl.innerHTML = `
+          <div class="card" style="background-color: var(--error-50); border: 2px solid var(--color-error);">
+            <div class="text-center">
+              <div class="text-4xl mb-4">⚠️</div>
+              <h3 class="text-error mb-3" style="font-size: var(--font-size-xl); font-weight: var(--font-weight-bold);">
+                You cannot repeat this test!
+              </h3>
+              <p class="text-base mb-2" style="color: var(--color-text-primary);">
+                This test has already been completed. Please select a different test.
+              </p>
+            </div>
+          </div>
+        `;
+        isLoading = false;
+        actionButton.disabled = false;
+        return;
+      }
+      
       showLoading();
 
       countTotalStations().then(max => {
@@ -1157,8 +1297,9 @@ async function handleNextStation(isAutoAdvance=false) {
         }
         currentStation = 1;
         stationTitle.textContent = `Test Station ${currentStation} of ${totalStations}`;
-        loadQuestions(currentStation);
-        updateButtonState();
+        loadQuestions(currentStation).then(() => {
+          updateButtonState();
+        });
       });
     }
 
@@ -1168,13 +1309,13 @@ async function handleNextStation(isAutoAdvance=false) {
       return;
     }
 
-    submitStation(currentStation, false);
+    await submitStation(currentStation, false);
     currentStation++;
     stationTitle.textContent = `Test Station ${currentStation} of ${totalStations}`;
     // Clear timer start time for new station - timer will reset to 2:00
     timerStartTime = null;
     // Timer will be reset to 2:00 in loadQuestions -> startTimer()
-    loadQuestions(currentStation);
+    await loadQuestions(currentStation);
     updateButtonState();
 
   } else {
@@ -1188,7 +1329,7 @@ async function handleNextStation(isAutoAdvance=false) {
       return;
     }
     
-    submitStation(currentStation, true);
+    await submitStation(currentStation, true);
   }
 }
 
@@ -1250,7 +1391,35 @@ function showCompletionScreen() {
 // ---------------------------
 // Submit
 // ---------------------------
-function submitStation(stationNumber, isFinal) {
+async function submitStation(stationNumber, isFinal) {
+  // CRITICAL: Check if test is completed before allowing submission
+  if (isFinal && userCredentials.test) {
+    // Ensure IP is loaded
+    if (!userIP) {
+      await getUserIP();
+    }
+    
+    if (isTestCompleted(userCredentials.test)) {
+      // Test is already completed - prevent submission
+      resultEl.className = "text-center mt-6 mb-6";
+      resultEl.innerHTML = `
+        <div class="card" style="background-color: var(--error-50); border: 2px solid var(--color-error);">
+          <div class="text-center">
+            <div class="text-4xl mb-4">⚠️</div>
+            <h3 class="text-error mb-3" style="font-size: var(--font-size-xl); font-weight: var(--font-weight-bold);">
+              Submission Denied
+            </h3>
+            <p class="text-base mb-2" style="color: var(--color-text-primary);">
+              This test has already been completed. You cannot submit again.
+            </p>
+          </div>
+        </div>
+      `;
+      clearTestState();
+      return;
+    }
+  }
+  
   const data = new URLSearchParams();
   data.append("name", userCredentials.name);
   data.append("email", userCredentials.email);
@@ -1345,17 +1514,17 @@ async function initializeTestState() {
         // Submit current station and move to next
         if (currentStation > 0 && currentStation <= totalStations) {
           // Small delay to show message
-          setTimeout(() => {
+          setTimeout(async () => {
             if (currentStation < totalStations) {
-              submitStation(currentStation, false);
+              await submitStation(currentStation, false);
               currentStation++;
               stationTitle.textContent = `Test Station ${currentStation} of ${totalStations}`;
               timerStartTime = null; // Reset for new station
-              loadQuestions(currentStation);
+              await loadQuestions(currentStation);
               updateButtonState();
             } else {
               // Last station - submit final
-              submitStation(currentStation, true);
+              await submitStation(currentStation, true);
             }
           }, 1500);
         }
@@ -1367,8 +1536,9 @@ async function initializeTestState() {
     if (currentStation > 0 && totalStations > 0) {
       stationTitle.textContent = `Test Station ${currentStation} of ${totalStations}`;
       updateOutOfBrowserTimeDisplay();
-      loadQuestions(currentStation);
-      updateButtonState();
+      loadQuestions(currentStation).then(() => {
+        updateButtonState();
+      });
       return true; // State restored
     }
   }
