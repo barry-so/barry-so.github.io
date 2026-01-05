@@ -52,16 +52,27 @@ function loadCredentialsForm() {
 }
 
 // ---------------------------
+// Pause Timer
+// ---------------------------
+function pauseTimer() {
+  if (timerInterval) {
+    clearInterval(timerInterval);
+    timerInterval = null;
+  }
+}
+
+// ---------------------------
 // Start Timer
 // ---------------------------
 function startTimer() {
+  pauseTimer();
   timeLeft = STATION_TIME;
   timerEl.textContent = `Time left: ${formatTime(timeLeft)}`;
   timerInterval = setInterval(() => {
     timeLeft--;
     timerEl.textContent = `Time left: ${formatTime(timeLeft)}`;
     if (timeLeft <= 0) {
-      clearInterval(timerInterval);
+      pauseTimer();
       handleNextStation();
     }
   }, 1000);
@@ -82,6 +93,7 @@ function formatTime(seconds) {
 function showLoading() {
   isLoading = true;
   actionButton.disabled = true;
+  pauseTimer();
   form.innerHTML = '<div class="loading">Loading questions...</div>';
   timerEl.textContent = "";
 }
@@ -216,7 +228,7 @@ function updateButtonState() {
 function handleNextStation() {
   if (isLoading) return;
   
-  clearInterval(timerInterval);
+  pauseTimer();
   resultEl.textContent = "";
 
   if (currentStation === 0) {
