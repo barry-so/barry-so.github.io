@@ -2,93 +2,122 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>BarrySO Daily</title>
-  <style>
-    body { font-family: Arial; padding: 20px; }
-    form { max-width: 600px; margin: auto; }
-    .question { margin-bottom: 15px; }
-    .options input { margin-right: 5px; }
-    .credentials-section { margin-bottom: 20px; }
-    .credentials-section label { display: block; margin-bottom: 10px; }
-    .credentials-section input, .credentials-section select { width: 100%; padding: 8px; margin-top: 5px; box-sizing: border-box; }
-    button { padding: 10px 20px; font-size: 16px; cursor: pointer; }
-    button:disabled { opacity: 0.5; cursor: not-allowed; }
-    #actionButton { display: block; margin: 20px auto; }
-    #timer { text-align: center; font-size: 18px; font-weight: bold; margin: 20px 0; }
-    #result { text-align: center; margin-top: 20px; }
-    .loading { text-align: center; font-size: 18px; padding: 40px; }
-    .completion-screen {
-      max-width: 600px;
-      margin: 50px auto;
-      text-align: center;
-      padding: 40px;
-      background-color: #f9f9f9;
-      border-radius: 10px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    }
-    .completion-screen h2 {
-      color: #28a745;
-      font-size: 32px;
-      margin-bottom: 20px;
-    }
-    .completion-screen p {
-      font-size: 18px;
-      color: #333;
-      margin: 15px 0;
-      line-height: 1.6;
-    }
-    .completion-icon {
-      font-size: 64px;
-      margin-bottom: 20px;
-    }
-    .footer { 
-      position: fixed; 
-      bottom: 0; 
-      left: 0; 
-      right: 0; 
-      background-color: #f5f5f5; 
-      padding: 15px; 
-      text-align: center; 
-      font-size: 12px; 
-      color: #666; 
-      border-top: 1px solid #ddd;
-    }
-    .footer a { 
-      color: #0066cc; 
-      text-decoration: none; 
-      margin: 0 10px;
-    }
-    .footer a:hover { 
-      text-decoration: underline; 
-    }
-    .footer-content {
-      max-width: 800px;
-      margin: 0 auto;
-    }
-    body { 
-      padding-bottom: 100px; 
-    }
-  </style>
+  <link rel="stylesheet" href="theme.css">
 </head>
 <body>
-  <h2 id="stationTitle">Enter Your Details (will be used on leaderboard)</h2>
-  <form id="testForm"></form>
-  <button id="actionButton" disabled>Begin Test</button>
-  <div id="timer"></div>
-  <div id="result"></div>
+  <a href="#main-content" class="skip-link">Skip to main content</a>
   
-  <div class="footer">
+  <button id="sidebarToggle" class="hamburger-menu" aria-label="Toggle sidebar" aria-expanded="false">
+    <span></span>
+    <span></span>
+    <span></span>
+  </button>
+  
+  <aside id="sidebar" class="sidebar" aria-label="Sidebar navigation">
+    <div class="sidebar-content">
+      <!-- Question Navigation Bar -->
+      <div id="questionNav" class="question-nav" style="display: none;">
+        <div class="question-nav-header">
+          <div class="question-nav-left">
+            <h3 class="question-nav-title">Question Navigator</h3>
+            <div class="question-nav-stats">
+              <span id="navStatsTotal">Total: 0</span>
+              <span id="navStatsAnswered">Answered: 0</span>
+              <span id="navStatsSkipped">Skipped: 0</span>
+              <span id="navStatsMarked">Marked: 0</span>
+            </div>
+          </div>
+          <div class="question-nav-right">
+            <!-- Out of Browser Time Display -->
+            <div id="outOfBrowserTime" class="out-of-browser-time" style="display: none;"></div>
+            <!-- Timer Display -->
+            <div id="timer" class="timer-display-inline" role="timer" aria-live="polite"></div>
+          </div>
+        </div>
+        <div id="questionNavGrid" class="question-nav-grid"></div>
+        <div class="question-nav-legend">
+          <div class="question-nav-legend-item">
+            <div class="question-nav-legend-color legend-default"></div>
+            <span>Unanswered</span>
+          </div>
+          <div class="question-nav-legend-item">
+            <div class="question-nav-legend-color legend-answered"></div>
+            <span>Answered</span>
+          </div>
+          <div class="question-nav-legend-item">
+            <div class="question-nav-legend-color legend-skipped"></div>
+            <span>Skipped</span>
+          </div>
+          <div class="question-nav-legend-item">
+            <div class="question-nav-legend-color legend-marked"></div>
+            <span>Marked for Review</span>
+          </div>
+          <div class="question-nav-legend-item">
+            <div class="question-nav-legend-color legend-current"></div>
+            <span>Current</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </aside>
+  
+  <div id="sidebarOverlay" class="sidebar-overlay"></div>
+  
+  <div class="container">
+    <header class="mb-6">
+      <h1 id="stationTitle" class="h2 text-center mb-4">Enter Your Details (will be used on leaderboard)</h1>
+    </header>
+
+    <main id="main-content">
+
+      <!-- Main Form -->
+      <form id="testForm" class="card"></form>
+
+      <!-- Action Button -->
+      <div id="actionButtonContainer" class="text-center mt-6 mb-6">
+        <button id="actionButton" class="card-interactive" disabled>Begin Test</button>
+      </div>
+
+      <!-- Result Messages -->
+      <div id="result" class="text-center mt-6" role="status" aria-live="polite"></div>
+    </main>
+  </div>
+  
+  <footer class="footer">
     <div class="footer-content">
       <strong>BarrySO</strong> | 
       <a href="https://discord.gg/FrpjBr9gpv" target="_blank" rel="noopener noreferrer">Support Discord Server</a> | 
       <a href="mailto:kimethan572@gmail.com">kimethan572@gmail.com</a>
       <br>
-      <span style="font-size: 11px; margin-top: 5px; display: block;">
-        Need help? Join our Discord or email us. Each station has a 2-minute timer. You cannot return to previous stations. For more help, visit our <a href="https://docs.google.com/document/d/1XhGNbh9xMpFFN_Oq1x6P55tbCmErfFWXg8Kcrx3wvL8/edit?usp=sharing" target="_blank" rel="noopener noreferrer">rules document</a>.
+      <span class="text-sm" style="margin-top: 5px; display: block;">
+        Need help? Join our Discord or email us. Each station has a 2-minute timer. Reference our <a href="https://docs.google.com/document/d/1XhGNbh9xMpFFN_Oq1x6P55tbCmErfFWXg8Kcrx3wvL8/edit?usp=sharing" target="_blank" rel="noopener noreferrer">rules document</a>.
       </span>
     </div>
-  </div>
+  </footer> 
   
   <script src="test.js"></script>
+  <script>
+    (function() {
+      const sidebarToggle = document.getElementById('sidebarToggle');
+      const sidebar = document.getElementById('sidebar');
+      const sidebarOverlay = document.getElementById('sidebarOverlay');
+      
+      function toggleSidebar() {
+        const isOpen = sidebar.classList.toggle('open');
+        sidebarOverlay.classList.toggle('active', isOpen);
+        sidebarToggle.setAttribute('aria-expanded', isOpen);
+      }
+      
+      sidebarToggle.addEventListener('click', toggleSidebar);
+      
+      document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && sidebar.classList.contains('open')) {
+          toggleSidebar();
+        }
+      });
+    })();
+  </script>
 </body>
 </html>
