@@ -269,6 +269,7 @@ function submitStation(stationNumber, isFinal) {
 
   new FormData(form).forEach((value, key) => data.append(key, value));
   data.append("test", "BioTest1");
+  if (isFinal) data.append("final", "true");
   fetch("https://barry-proxy2.kimethan572.workers.dev/", {
     method: "POST",
     body: data
