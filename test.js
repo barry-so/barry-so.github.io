@@ -21,6 +21,7 @@ let isLoading = false;
 // Load Credentials Form
 // ---------------------------
 function loadCredentialsForm() {
+  stopTimer();
   stationTitle.textContent = "Enter Your Credentials";
   form.innerHTML = `
     <div class="credentials-section">
@@ -52,28 +53,32 @@ function loadCredentialsForm() {
 }
 
 // ---------------------------
-// Pause Timer
+// Stop Timer
 // ---------------------------
-function pauseTimer() {
+function stopTimer() {
   if (timerInterval) {
     clearInterval(timerInterval);
     timerInterval = null;
   }
+  timerEl.textContent = "";
 }
 
 // ---------------------------
 // Start Timer
 // ---------------------------
 function startTimer() {
-  pauseTimer();
+  stopTimer();
   timeLeft = STATION_TIME;
   timerEl.textContent = `Time left: ${formatTime(timeLeft)}`;
   timerInterval = setInterval(() => {
-    timeLeft--;
-    timerEl.textContent = `Time left: ${formatTime(timeLeft)}`;
+    if (timeLeft > 0) {
+      timeLeft--;
+      timerEl.textContent = `Time left: ${formatTime(timeLeft)}`;
+    }
     if (timeLeft <= 0) {
-      pauseTimer();
-      handleNextStation();
+      stopTimer();
+      timerEl.textContent = `Time left: ${formatTime(0)}`;
+      handleNextStation(true);
     }
   }, 1000);
 }
@@ -93,9 +98,8 @@ function formatTime(seconds) {
 function showLoading() {
   isLoading = true;
   actionButton.disabled = true;
-  pauseTimer();
+  stopTimer();
   form.innerHTML = '<div class="loading">Loading questions...</div>';
-  timerEl.textContent = "";
 }
 
 // ---------------------------
@@ -144,28 +148,21 @@ function loadQuestions(stationNumber) {
           // Multiple choice
           div.innerHTML = `<p>${q.question}</p>` +
             q.options.map(opt =>
-              `<label><input type="radio" name="q${idx + 1}" value="${opt}" required> ${opt}</label>`
+              `<label><input type="radio" name="q${idx + 1}" value="${opt}"> ${opt}</label>`
             ).join("<br>");
         } else {
           // Open-ended
-          div.innerHTML = `<p>${q.question}</p><input type="text" name="q${idx + 1}" required>`;
+          div.innerHTML = `<p>${q.question}</p><input type="text" name="q${idx + 1}">`;
         }
 
         form.appendChild(div);
-      });
-
-      // Add validation listeners
-      const inputs = form.querySelectorAll("input");
-      inputs.forEach(input => {
-        input.addEventListener("input", validateForm);
-        input.addEventListener("change", validateForm);
       });
 
       isLoading = false;
       
       // Update button state
       updateButtonState();
-      validateForm();
+      actionButton.disabled = false;
 
       // Start timer after questions are fully loaded
       startTimer();
@@ -191,21 +188,8 @@ function validateForm() {
     const email = document.getElementById("emailInput")?.value.trim();
     actionButton.disabled = !(name && email);
   } else {
-    const formData = new FormData(form);
-    let allFilled = true;
-
-    const inputs = form.querySelectorAll("input[required]");
-    inputs.forEach(input => {
-      if (input.type === "radio") {
-        const name = input.name;
-        const checked = form.querySelector(`input[name="${name}"]:checked`);
-        if (!checked) allFilled = false;
-      } else {
-        if (!input.value.trim()) allFilled = false;
-      }
-    });
-
-    actionButton.disabled = !allFilled;
+    // No validation required for stations - button is always enabled
+    actionButton.disabled = false;
   }
 }
 
@@ -225,10 +209,10 @@ function updateButtonState() {
 // ---------------------------
 // Handle Next Station
 // ---------------------------
-function handleNextStation() {
+function handleNextStation(isAutoAdvance = false) {
   if (isLoading) return;
   
-  pauseTimer();
+  stopTimer();
   resultEl.textContent = "";
 
   if (currentStation === 0) {
@@ -244,14 +228,24 @@ function handleNextStation() {
         return;
       }
       
-      // Move to first actual station
+      // Move to first actual station (timer will start when questions load)
       currentStation = 1;
       stationTitle.textContent = `Test Station ${currentStation}`;
       loadQuestions(currentStation);
       updateButtonState();
     });
   } else if (currentStation < totalStations) {
-    // Submit current station and move to next
+    // Show warning before moving to next station (only for manual clicks)
+    if (!isAutoAdvance) {
+      const confirmed = confirm("Moving onto next station means you cannot return. Continue?");
+      if (!confirmed) {
+        // Resume timer if user cancels
+        startTimer();
+        return;
+      }
+    }
+    
+    // Submit current station and move to next (timer will restart when questions load)
     submitStation(currentStation, false);
     currentStation++;
     stationTitle.textContent = `Test Station ${currentStation}`;
@@ -259,6 +253,7 @@ function handleNextStation() {
     updateButtonState();
   } else {
     // Final station - submit everything
+    stopTimer();
     submitStation(currentStation, true);
   }
 }
