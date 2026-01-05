@@ -933,23 +933,21 @@ button.bg-primary:hover:not(:disabled) {
   justify-content: center;
   gap: clamp(0.125rem, 0.5vh, 0.25rem);
   text-align: center;
-  font-size: clamp(0.625rem, 1.5vw, 0.8125rem);
-  line-height: 1.2;
-  color: var(--color-text-secondary);
   padding: clamp(0.25rem, 0.5vh, 0.5rem) 0;
 }
 
-.footer-content > *:first-child {
+.footer-main {
+  font-size: clamp(0.625rem, 1.5vw, 0.8125rem);
+  line-height: 1.2;
+  color: var(--color-text-secondary);
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
 }
 
 .footer-help-text {
   font-size: clamp(0.5rem, 1.2vw, 0.625rem);
   line-height: 1.1;
   opacity: 0.85;
+  color: var(--color-text-secondary);
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
