@@ -19,6 +19,7 @@ let timeLeft = STATION_TIME;
 let timerInterval;
 let userCredentials = { name: "", email: "", test: "" };
 let isLoading = false;
+let isSubmitting = false;
 let currentQuestions = [];
 let questionStates = {};
 let currentQuestionNum = 1;
@@ -1057,6 +1058,7 @@ function ensureButtonVisible() {
 
 async function handleNextStation(isAutoAdvance=false) {
   if (isLoading) return;
+  if (isSubmitting) return;
 
   stopTimer();
   resultEl.textContent = "";
@@ -1265,6 +1267,11 @@ function showCompletionScreen() {
 }
 
 async function submitStation(stationNumber, isFinal) {
+  if (isSubmitting) return;
+  
+  isSubmitting = true;
+  actionButton.disabled = true;
+  
   if (isFinal && userCredentials.test) {
     if (!userIP) {
       await getUserIP();
@@ -1286,6 +1293,9 @@ async function submitStation(stationNumber, isFinal) {
         </div>
       `;
       clearTestState();
+      isSubmitting = false;
+      actionButton.disabled = false;
+      updateButtonState();
       return;
     }
   }
@@ -1305,11 +1315,18 @@ async function submitStation(stationNumber, isFinal) {
   fetch("https://barry-proxy2.kimethan572.workers.dev/", { method: "POST", body: data })
     .then(res => res.json())
     .then(() => {
+      isSubmitting = false;
       if (isFinal) {
         showCompletionScreen();
+      } else {
+        actionButton.disabled = false;
+        updateButtonState();
       }
     })
     .catch(err => {
+      isSubmitting = false;
+      actionButton.disabled = false;
+      updateButtonState();
       if (isFinal) {
         resultEl.textContent = `Error submitting test: ${err}`;
         resultEl.className = "text-center mt-6 text-error";
