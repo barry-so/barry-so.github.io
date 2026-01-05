@@ -159,7 +159,7 @@ function validateForm() {
 function updateButtonState() {
   if (currentStation === 0) {
     actionButton.textContent = "Begin Test";
-  } else if (currentStation >= TOTAL_STATIONS) {
+  } else if (currentStation === TOTAL_STATIONS) {
     actionButton.textContent = "Submit Test";
   } else {
     actionButton.textContent = "Next Station";
@@ -213,7 +213,7 @@ function submitStation(stationNumber, isFinal) {
     .then(res => res.json())
     .then(result => {
       if (isFinal) {
-        resultEl.textContent = `Test completed! Your score: ${result.score || 'N/A'}`;
+        resultEl.textContent = "Test completed!";
         actionButton.disabled = true;
         actionButton.textContent = "Test Submitted";
       }
