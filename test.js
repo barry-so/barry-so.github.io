@@ -99,10 +99,38 @@ function loadCredentialsForm() {
   const nameInput = document.getElementById("nameInput");
   const emailInput = document.getElementById("emailInput");
 
-  function validateCredentials() {
+  async function validateCredentials() {
     const test = testSelect.value;
     const name = nameInput.value.trim();
     const email = emailInput.value.trim();
+    
+    // Check if test is already completed
+    if (test) {
+      await getUserIP(); // Ensure IP is loaded
+      if (isTestCompleted(test)) {
+        resultEl.className = "text-center mt-6 mb-6";
+        resultEl.innerHTML = `
+          <div class="card" style="background-color: var(--error-50); border: 2px solid var(--color-error);">
+            <div class="text-center">
+              <div class="text-4xl mb-4">⚠️</div>
+              <h3 class="text-error mb-3" style="font-size: var(--font-size-xl); font-weight: var(--font-weight-bold);">
+                You cannot repeat this test!
+              </h3>
+              <p class="text-base mb-2" style="color: var(--color-text-primary);">
+                This test has already been completed. Please select a different test.
+              </p>
+            </div>
+          </div>
+        `;
+        actionButton.disabled = true;
+        return;
+      } else {
+        // Clear any previous error messages
+        resultEl.textContent = "";
+        resultEl.className = "text-center mt-6";
+      }
+    }
+    
     actionButton.disabled = !(test && name && email);
   }
 
@@ -154,6 +182,44 @@ async function getUserIP() {
 function getStateKey() {
   if (!userIP || !userCredentials.test) return null;
   return `test_state_${userIP}_${userCredentials.test}`;
+}
+
+// ---------------------------
+// Get Completion Key
+// ---------------------------
+function getCompletionKey(testName) {
+  if (!userIP || !testName) return null;
+  return `test_completed_${userIP}_${testName}`;
+}
+
+// ---------------------------
+// Check if Test is Completed
+// ---------------------------
+function isTestCompleted(testName) {
+  const completionKey = getCompletionKey(testName);
+  if (!completionKey) return false;
+  
+  try {
+    const completed = localStorage.getItem(completionKey);
+    return completed === 'true';
+  } catch (err) {
+    console.error('Failed to check completion status:', err);
+    return false;
+  }
+}
+
+// ---------------------------
+// Mark Test as Completed
+// ---------------------------
+function markTestCompleted(testName) {
+  const completionKey = getCompletionKey(testName);
+  if (!completionKey) return;
+  
+  try {
+    localStorage.setItem(completionKey, 'true');
+  } catch (err) {
+    console.error('Failed to mark test as completed:', err);
+  }
 }
 
 // ---------------------------
@@ -1017,6 +1083,27 @@ async function handleNextStation(isAutoAdvance=false) {
     // Get IP if not already set
     await getUserIP();
     
+    // Check if test is already completed
+    if (isTestCompleted(userCredentials.test)) {
+      resultEl.className = "text-center mt-6 mb-6";
+      resultEl.innerHTML = `
+        <div class="card" style="background-color: var(--error-50); border: 2px solid var(--color-error);">
+          <div class="text-center">
+            <div class="text-4xl mb-4">⚠️</div>
+            <h3 class="text-error mb-3" style="font-size: var(--font-size-xl); font-weight: var(--font-weight-bold);">
+              You cannot repeat this test!
+            </h3>
+            <p class="text-base mb-2" style="color: var(--color-text-primary);">
+              This test has already been completed. Please select a different test.
+            </p>
+          </div>
+        </div>
+      `;
+      isLoading = false;
+      actionButton.disabled = false;
+      return;
+    }
+    
     // Check for existing state for this test
     const savedState = loadTestState();
     if (savedState && savedState.userCredentials.test === userCredentials.test) {
@@ -1123,6 +1210,9 @@ function showCompletionScreen() {
   // Format total out of browser time
   const outOfBrowserTimeFormatted = formatTime(totalOutOfBrowserTime);
   
+  // Mark test as completed
+  markTestCompleted(userCredentials.test);
+  
   // Clear saved state after completion
   clearTestState();
   
@@ -1212,6 +1302,13 @@ async function initializeTestState() {
   // Check for saved state
   const savedState = loadTestState();
   if (savedState && savedState.userCredentials) {
+    // Check if this test is already completed
+    if (isTestCompleted(savedState.userCredentials.test)) {
+      // Test is completed - clear state and show credentials form
+      clearTestState();
+      return false;
+    }
+    
     // Restore credentials
     userCredentials = savedState.userCredentials;
     currentStation = savedState.currentStation || 0;
