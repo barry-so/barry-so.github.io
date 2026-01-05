@@ -130,7 +130,7 @@ function countTotalStations() {
 function loadQuestions(stationNumber) {
   showLoading();
   
-  fetch(`https://barry-proxy2.kimethan572.workers.dev?station=${stationNumber}`)
+  fetch(`https://barry-proxy2.kimethan572.workers.dev?test=BioTest1&station=${stationNumber}`)
     .then(res => res.json())
     .then(data => {
       if (!data.length) {
@@ -268,7 +268,7 @@ function submitStation(stationNumber, isFinal) {
   data.append("station", stationNumber.toString());
 
   new FormData(form).forEach((value, key) => data.append(key, value));
-
+  data.append("test", "BioTest1");
   fetch("https://barry-proxy2.kimethan572.workers.dev/", {
     method: "POST",
     body: data
