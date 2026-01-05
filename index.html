@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>BarrySO</title>
+  <title>BarrySO Daily</title>
   <style>
     body { font-family: Arial; padding: 20px; }
     form { max-width: 600px; margin: auto; }
@@ -10,13 +10,37 @@
     .options input { margin-right: 5px; }
     .credentials-section { margin-bottom: 20px; }
     .credentials-section label { display: block; margin-bottom: 10px; }
-    .credentials-section input { width: 100%; padding: 8px; margin-top: 5px; box-sizing: border-box; }
+    .credentials-section input, .credentials-section select { width: 100%; padding: 8px; margin-top: 5px; box-sizing: border-box; }
     button { padding: 10px 20px; font-size: 16px; cursor: pointer; }
     button:disabled { opacity: 0.5; cursor: not-allowed; }
     #actionButton { display: block; margin: 20px auto; }
     #timer { text-align: center; font-size: 18px; font-weight: bold; margin: 20px 0; }
     #result { text-align: center; margin-top: 20px; }
     .loading { text-align: center; font-size: 18px; padding: 40px; }
+    .completion-screen {
+      max-width: 600px;
+      margin: 50px auto;
+      text-align: center;
+      padding: 40px;
+      background-color: #f9f9f9;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    .completion-screen h2 {
+      color: #28a745;
+      font-size: 32px;
+      margin-bottom: 20px;
+    }
+    .completion-screen p {
+      font-size: 18px;
+      color: #333;
+      margin: 15px 0;
+      line-height: 1.6;
+    }
+    .completion-icon {
+      font-size: 64px;
+      margin-bottom: 20px;
+    }
     .footer { 
       position: fixed; 
       bottom: 0; 
@@ -26,11 +50,11 @@
       padding: 15px; 
       text-align: center; 
       font-size: 12px; 
-      color: #667; 
+      color: #666; 
       border-top: 1px solid #ddd;
     }
     .footer a { 
-      color: #0067cc; 
+      color: #0066cc; 
       text-decoration: none; 
       margin: 0 10px;
     }
@@ -47,15 +71,8 @@
   </style>
 </head>
 <body>
-<h2 id="stationTitle">Enter Your Credentials</h2>
-
-<div style="text-align:center; margin-bottom:15px;">
-  <label for="testSelect"><strong>Select Test:</strong></label><br>
-  <select id="testSelect" style="padding:6px; font-size:16px;"></select>
-</div>
-
-<form id="testForm"></form>
-
+  <h2 id="stationTitle">Enter Your Details (will be used on leaderboard)</h2>
+  <form id="testForm"></form>
   <button id="actionButton" disabled>Begin Test</button>
   <div id="timer"></div>
   <div id="result"></div>
@@ -67,7 +84,7 @@
       <a href="mailto:kimethan572@gmail.com">kimethan572@gmail.com</a>
       <br>
       <span style="font-size: 11px; margin-top: 5px; display: block;">
-        Need help? Join our Discord or email us. Each station has a 2-minute timer. You cannot return to previous stations. For more help, visit our <a href="https://docs.google.com/document/d/1XhGNbh9xMpFFN_Oq1x6P55tbCmErfFWXg8Kcrx3wvL8/edit?usp=sharing" target="_blank" rel="noopener noreferrer">rules page</a>.
+        Need help? Join our Discord or email us. Each station has a 2-minute timer. You cannot return to previous stations. For more help, visit our <a href="https://docs.google.com/document/d/1XhGNbh9xMpFFN_Oq1x6P55tbCmErfFWXg8Kcrx3wvL8/edit?usp=sharing" target="_blank" rel="noopener noreferrer">rules document</a>.
       </span>
     </div>
   </div>

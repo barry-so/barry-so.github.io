@@ -7,7 +7,6 @@ const actionButton = document.getElementById("actionButton");
 const timerEl = document.getElementById("timer");
 const resultEl = document.getElementById("result");
 const stationTitle = document.getElementById("stationTitle");
-const testSelect = document.getElementById("testSelect");
 
 const STATION_TIME = 120;
 
@@ -22,16 +21,27 @@ let isLoading = false;
 // Load Test List
 // ---------------------------
 function loadTestList() {
+  const testSelect = document.getElementById("testSelect");
+  if (!testSelect) return;
+  
   fetch("https://barry-proxy2.kimethan572.workers.dev?action=listTests")
     .then(res => res.json())
     .then(tests => {
       testSelect.innerHTML = "";
+      if (tests.length === 0) {
+        testSelect.innerHTML = '<option value="">No tests available</option>';
+        return;
+      }
       tests.forEach(t => {
         const opt = document.createElement("option");
         opt.value = t;
         opt.textContent = t;
         testSelect.appendChild(opt);
       });
+    })
+    .catch(err => {
+      testSelect.innerHTML = '<option value="">Error loading tests</option>';
+      console.error(err);
     });
 }
 
@@ -40,9 +50,15 @@ function loadTestList() {
 // ---------------------------
 function loadCredentialsForm() {
   stopTimer();
-  stationTitle.textContent = "Enter Your Credentials";
+  stationTitle.textContent = "Enter Your Details (will be used on leaderboard)";
   form.innerHTML = `
     <div class="credentials-section">
+      <label>
+        Test:
+        <select id="testSelect" name="test" required>
+          <option value="">Loading tests...</option>
+        </select>
+      </label>
       <label>
         Name:
         <input type="text" id="nameInput" name="name" required>
@@ -57,17 +73,22 @@ function loadCredentialsForm() {
   actionButton.textContent = "Begin Test";
   actionButton.disabled = true;
 
+  const testSelect = document.getElementById("testSelect");
   const nameInput = document.getElementById("nameInput");
   const emailInput = document.getElementById("emailInput");
 
   function validateCredentials() {
+    const test = testSelect.value;
     const name = nameInput.value.trim();
     const email = emailInput.value.trim();
-    actionButton.disabled = !(name && email);
+    actionButton.disabled = !(test && name && email);
   }
 
+  testSelect.addEventListener("change", validateCredentials);
   nameInput.addEventListener("input", validateCredentials);
   emailInput.addEventListener("input", validateCredentials);
+  
+  loadTestList();
 }
 
 // ---------------------------
@@ -191,14 +212,20 @@ function handleNextStation(isAutoAdvance=false) {
   resultEl.textContent = "";
 
   if (currentStation === 0) {
+    // Show loading screen immediately to prevent multiple clicks
+    showLoading();
+    
     userCredentials.name = document.getElementById("nameInput").value.trim();
     userCredentials.email = document.getElementById("emailInput").value.trim();
-    userCredentials.test = testSelect.value;
+    userCredentials.test = document.getElementById("testSelect").value;
 
     countTotalStations().then(max => {
       totalStations = max;
       if (!totalStations) {
         resultEl.textContent = "No stations available.";
+        isLoading = false;
+        actionButton.disabled = false;
+        form.innerHTML = "";
         return;
       }
       currentStation = 1;
@@ -225,6 +252,29 @@ function handleNextStation(isAutoAdvance=false) {
 }
 
 // ---------------------------
+// Show Completion Screen
+// ---------------------------
+function showCompletionScreen() {
+  stopTimer();
+  form.innerHTML = `
+    <div class="completion-screen">
+      <div class="completion-icon">✓</div>
+      <h2>Test Completed!</h2>
+      <p>Thank you for completing the test, <strong>${userCredentials.name}</strong>!</p>
+      <p>Your responses have been submitted successfully.</p>
+      <p>Check the leaderboard to see your results and ranking.</p>
+      <p style="font-size: 14px; color: #666; margin-top: 30px;">
+        Need help? Join our <a href="https://discord.gg/FrpjBr9gpv" target="_blank" rel="noopener noreferrer">Discord Server</a> or email us at <a href="mailto:kimethan572@gmail.com">kimethan572@gmail.com</a>
+      </p>
+    </div>
+  `;
+  actionButton.style.display = "none";
+  timerEl.textContent = "";
+  stationTitle.textContent = "";
+  resultEl.textContent = "";
+}
+
+// ---------------------------
 // Submit
 // ---------------------------
 function submitStation(stationNumber, isFinal) {
@@ -241,10 +291,13 @@ function submitStation(stationNumber, isFinal) {
     .then(res => res.json())
     .then(() => {
       if (isFinal) {
-        resultEl.textContent = "Test completed!";
-        actionButton.disabled = true;
-        actionButton.textContent = "Test Submitted";
-        form.innerHTML = "";
+        showCompletionScreen();
+      }
+    })
+    .catch(err => {
+      if (isFinal) {
+        resultEl.textContent = `Error submitting test: ${err}`;
+        console.error(err);
       }
     });
 }
@@ -252,7 +305,6 @@ function submitStation(stationNumber, isFinal) {
 // ---------------------------
 // Init
 // ---------------------------
-loadTestList();
 loadCredentialsForm();
 
 actionButton.addEventListener("click", () => {
