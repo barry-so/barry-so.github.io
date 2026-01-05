@@ -212,12 +212,13 @@ function handleNextStation(isAutoAdvance=false) {
   resultEl.textContent = "";
 
   if (currentStation === 0) {
-    // Show loading screen immediately to prevent multiple clicks
-    showLoading();
-    
+    // Get credentials before clearing the form
     userCredentials.name = document.getElementById("nameInput").value.trim();
     userCredentials.email = document.getElementById("emailInput").value.trim();
     userCredentials.test = document.getElementById("testSelect").value;
+    
+    // Show loading screen immediately to prevent multiple clicks
+    showLoading();
 
     countTotalStations().then(max => {
       totalStations = max;
