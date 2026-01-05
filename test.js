@@ -1166,7 +1166,10 @@ function submitStation(stationNumber, isFinal) {
   data.append("email", userCredentials.email);
   data.append("station", stationNumber);
   data.append("test", userCredentials.test);
-  if (isFinal) data.append("final", "true");
+  if (isFinal) {
+    data.append("final", "true");
+    data.append("oobTime", totalOutOfBrowserTime.toString()); // Add OOB time
+  }
 
   new FormData(form).forEach((v,k) => data.append(k,v));
 
