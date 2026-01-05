@@ -3,35 +3,83 @@
 // ===========================
 
 const form = document.getElementById("testForm");
-const station = "1"; // Change dynamically per station
-const STATION_TIME = 300; // seconds per station
-
+const actionButton = document.getElementById("actionButton");
 const timerEl = document.getElementById("timer");
 const resultEl = document.getElementById("result");
+const stationTitle = document.getElementById("stationTitle");
 
+const STATION_TIME = 120; // 2 minutes per station
+const TOTAL_STATIONS = 1; // Update this with actual number of stations
+
+let currentStation = 0; // 0 = credentials, 1+ = actual stations
 let timeLeft = STATION_TIME;
 let timerInterval;
+let userCredentials = { name: "", email: "" };
+
+// ---------------------------
+// Load Credentials Form
+// ---------------------------
+function loadCredentialsForm() {
+  stationTitle.textContent = "Enter Your Credentials";
+  form.innerHTML = `
+    <div class="credentials-section">
+      <label>
+        Name:
+        <input type="text" id="nameInput" name="name" required>
+      </label>
+      <label>
+        Email:
+        <input type="email" id="emailInput" name="email" required>
+      </label>
+    </div>
+  `;
+
+  actionButton.textContent = "Begin Test";
+  actionButton.disabled = true;
+
+  const nameInput = document.getElementById("nameInput");
+  const emailInput = document.getElementById("emailInput");
+
+  function validateCredentials() {
+    const name = nameInput.value.trim();
+    const email = emailInput.value.trim();
+    actionButton.disabled = !(name && email);
+  }
+
+  nameInput.addEventListener("input", validateCredentials);
+  emailInput.addEventListener("input", validateCredentials);
+}
 
 // ---------------------------
 // Start Timer
 // ---------------------------
 function startTimer() {
-  timerEl.textContent = `Time left: ${timeLeft}s`;
+  timeLeft = STATION_TIME;
+  timerEl.textContent = `Time left: ${formatTime(timeLeft)}`;
   timerInterval = setInterval(() => {
     timeLeft--;
-    timerEl.textContent = `Time left: ${timeLeft}s`;
+    timerEl.textContent = `Time left: ${formatTime(timeLeft)}`;
     if (timeLeft <= 0) {
       clearInterval(timerInterval);
-      submitForm();
+      handleNextStation();
     }
   }, 1000);
 }
 
 // ---------------------------
+// Format Time (MM:SS)
+// ---------------------------
+function formatTime(seconds) {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+}
+
+// ---------------------------
 // Fetch Questions from Worker
 // ---------------------------
-function loadQuestions() {
-  fetch(`https://barry-proxy2.kimethan572.workers.dev?station=${station}`)
+function loadQuestions(stationNumber) {
+  fetch(`https://barry-proxy2.kimethan572.workers.dev?station=${stationNumber}`)
     .then(res => res.json())
     .then(data => {
       if (!data.length) {
@@ -39,6 +87,7 @@ function loadQuestions() {
         return;
       }
 
+      form.innerHTML = "";
       data.forEach((q, idx) => {
         const div = document.createElement("div");
         div.classList.add("question");
@@ -57,8 +106,16 @@ function loadQuestions() {
         form.appendChild(div);
       });
 
-      // Add submit button
-      form.innerHTML += '<button type="submit">Submit</button>';
+      // Add validation listeners
+      const inputs = form.querySelectorAll("input");
+      inputs.forEach(input => {
+        input.addEventListener("input", validateForm);
+        input.addEventListener("change", validateForm);
+      });
+
+      // Update button state
+      updateButtonState();
+      validateForm();
 
       // Start timer after questions are loaded
       startTimer();
@@ -70,15 +127,82 @@ function loadQuestions() {
 }
 
 // ---------------------------
-// Submit Answers
+// Validate Form
 // ---------------------------
-function submitForm() {
+function validateForm() {
+  if (currentStation === 0) {
+    const name = document.getElementById("nameInput")?.value.trim();
+    const email = document.getElementById("emailInput")?.value.trim();
+    actionButton.disabled = !(name && email);
+  } else {
+    const formData = new FormData(form);
+    let allFilled = true;
+
+    const inputs = form.querySelectorAll("input[required]");
+    inputs.forEach(input => {
+      if (input.type === "radio") {
+        const name = input.name;
+        const checked = form.querySelector(`input[name="${name}"]:checked`);
+        if (!checked) allFilled = false;
+      } else {
+        if (!input.value.trim()) allFilled = false;
+      }
+    });
+
+    actionButton.disabled = !allFilled;
+  }
+}
+
+// ---------------------------
+// Update Button State
+// ---------------------------
+function updateButtonState() {
+  if (currentStation === 0) {
+    actionButton.textContent = "Begin Test";
+  } else if (currentStation >= TOTAL_STATIONS) {
+    actionButton.textContent = "Submit Test";
+  } else {
+    actionButton.textContent = "Next Station";
+  }
+}
+
+// ---------------------------
+// Handle Next Station
+// ---------------------------
+function handleNextStation() {
   clearInterval(timerInterval);
 
+  if (currentStation === 0) {
+    // Save credentials
+    userCredentials.name = document.getElementById("nameInput").value.trim();
+    userCredentials.email = document.getElementById("emailInput").value.trim();
+    
+    // Move to first actual station
+    currentStation = 1;
+    stationTitle.textContent = `Test Station ${currentStation}`;
+    loadQuestions(currentStation);
+    updateButtonState();
+  } else if (currentStation < TOTAL_STATIONS) {
+    // Submit current station and move to next
+    submitStation(currentStation, false);
+    currentStation++;
+    stationTitle.textContent = `Test Station ${currentStation}`;
+    loadQuestions(currentStation);
+    updateButtonState();
+  } else {
+    // Final station - submit everything
+    submitStation(currentStation, true);
+  }
+}
+
+// ---------------------------
+// Submit Station Answers
+// ---------------------------
+function submitStation(stationNumber, isFinal) {
   const data = new URLSearchParams();
-  data.append("name", prompt("Enter your name:"));
-  data.append("email", prompt("Enter your email:"));
-  data.append("station", station);
+  data.append("name", userCredentials.name);
+  data.append("email", userCredentials.email);
+  data.append("station", stationNumber.toString());
 
   new FormData(form).forEach((value, key) => data.append(key, value));
 
@@ -88,8 +212,11 @@ function submitForm() {
   })
     .then(res => res.json())
     .then(result => {
-      resultEl.textContent = `Your score: ${result.score}`;
-      form.reset();
+      if (isFinal) {
+        resultEl.textContent = `Test completed! Your score: ${result.score || 'N/A'}`;
+        actionButton.disabled = true;
+        actionButton.textContent = "Test Submitted";
+      }
     })
     .catch(err => {
       resultEl.textContent = `Error submitting answers: ${err}`;
@@ -98,14 +225,15 @@ function submitForm() {
 }
 
 // ---------------------------
-// Form Event Listener
+// Action Button Event Listener
 // ---------------------------
-form.addEventListener("submit", e => {
-  e.preventDefault();
-  submitForm();
+actionButton.addEventListener("click", () => {
+  if (!actionButton.disabled) {
+    handleNextStation();
+  }
 });
 
 // ---------------------------
 // Initialize
 // ---------------------------
-loadQuestions();
+loadCredentialsForm();

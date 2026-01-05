@@ -8,12 +8,20 @@
     form { max-width: 600px; margin: auto; }
     .question { margin-bottom: 15px; }
     .options input { margin-right: 5px; }
-    button { padding: 10px 20px; }
+    .credentials-section { margin-bottom: 20px; }
+    .credentials-section label { display: block; margin-bottom: 10px; }
+    .credentials-section input { width: 100%; padding: 8px; margin-top: 5px; box-sizing: border-box; }
+    button { padding: 10px 20px; font-size: 16px; cursor: pointer; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    #actionButton { display: block; margin: 20px auto; }
+    #timer { text-align: center; font-size: 18px; font-weight: bold; margin: 20px 0; }
+    #result { text-align: center; margin-top: 20px; }
   </style>
 </head>
 <body>
-  <h2>Test Station</h2>
+  <h2 id="stationTitle">Enter Your Credentials</h2>
   <form id="testForm"></form>
+  <button id="actionButton" disabled>Begin Test</button>
   <div id="timer"></div>
   <div id="result"></div>
   <script src="test.js"></script>
