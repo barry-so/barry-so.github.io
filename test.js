@@ -36,6 +36,27 @@ const IMAGE_CACHE_MAX_SIZE = 50 * 1024 * 1024;
 let imageCacheSize = 0;
 let scrollUnloadHandler = null;
 
+// Worker pools for CPU-intensive operations
+let questionParserPool = null;
+let stateWorkerPool = null;
+
+// Initialize worker pools
+function initializeWorkerPools() {
+  if (window.Worker) {
+    try {
+      questionParserPool = new WorkerPool('question-parser-worker.js');
+      stateWorkerPool = new WorkerPool('state-worker.js');
+      questionParserPool.initialize();
+      stateWorkerPool.initialize();
+    } catch (err) {
+      console.warn('Failed to initialize worker pools:', err);
+    }
+  }
+}
+
+// Initialize on load
+initializeWorkerPools();
+
 function throttle(func, limit) {
   let inThrottle;
   return function() {
@@ -49,12 +70,10 @@ function throttle(func, limit) {
   };
 }
 
-function parseImagesInQuestion(questionText, questionNum) {
+// Fallback synchronous version (used if workers fail)
+function parseImagesInQuestionSync(questionText, questionNum) {
   const dataUriPattern = /(data:image\/[^;]+;base64,[^\s<>"']+)/gi;
-  // URL pattern with file extensions
   const urlPatternWithExt = /(https?:\/\/[^\s<>"']+\.(jpg|jpeg|png|gif|webp|svg|bmp)(\?[^\s<>"']*)?)/gi;
-  // More permissive pattern for URLs that might be images (no extension required)
-  // This matches URLs that are likely images based on common image hosting domains or patterns
   const urlPatternPermissive = /(https?:\/\/[^\s<>"']+)/gi;
   
   if (!questionText || typeof questionText !== 'string') {
@@ -62,7 +81,6 @@ function parseImagesInQuestion(questionText, questionNum) {
     return questionText || '';
   }
   
-  // Check if question already contains HTML img tags
   const hasImgTags = /<img[^>]*>/i.test(questionText);
   if (hasImgTags) {
     return questionText;
@@ -71,40 +89,24 @@ function parseImagesInQuestion(questionText, questionNum) {
   let processedText = questionText;
   let imageCounter = 0;
   
-  // Process base64 images
-  // replace() automatically preserves text before and after the match
-  // Example: "Text before data:image/jpeg;base64,... text after" 
-  //          becomes "Text before <img> text after"
   processedText = processedText.replace(dataUriPattern, (match) => {
     imageCounter++;
     const imageId = `img-${questionNum}-${Date.now()}-${imageCounter}`;
     return createImageHTML(match, imageId, questionNum, true);
   });
   
-  // Process URL images with extensions
-  // replace() automatically preserves text before and after the match
-  // Example: "Text before https://image.jpg text after"
-  //          becomes "Text before <img> text after"
   processedText = processedText.replace(urlPatternWithExt, (match) => {
     imageCounter++;
     const imageId = `img-${questionNum}-${Date.now()}-${imageCounter}`;
     return createImageHTML(match, imageId, questionNum, false);
   });
   
-  // Check for URLs without extensions (only if no images found yet)
-  // This handles URLs that might be images but don't have file extensions
-  // replace() automatically preserves text before and after the URL
-  // Example: "Text before https://image.com/path text after"
-  //          becomes "Text before <img> text after"
   if (imageCounter === 0) {
-    // Use replace() with a function to process all matching URLs
-    // This preserves text before/after each URL and handles multiple URLs
     processedText = processedText.replace(urlPatternPermissive, (urlMatch) => {
       const urlLength = urlMatch.length;
       const textLength = questionText.length;
       const urlRatio = urlLength / textLength;
       
-      // Check if URL is standalone (with optional whitespace) or takes up 80%+ of text
       const trimmedUrl = urlMatch.trim();
       const trimmedText = questionText.trim();
       const isStandaloneUrl = trimmedText === trimmedUrl || 
@@ -114,15 +116,58 @@ function parseImagesInQuestion(questionText, questionNum) {
       if (isStandaloneUrl || isLargeUrl) {
         imageCounter++;
         const imageId = `img-${questionNum}-${Date.now()}-${imageCounter}`;
-        // Return image HTML - replace() preserves text before/after automatically
         return createImageHTML(urlMatch, imageId, questionNum, false);
       }
-      // Return original URL if it doesn't meet criteria (preserves it in text)
       return urlMatch;
     });
   }
   
   return processedText;
+}
+
+// Async version using worker pool
+async function parseImagesInQuestion(questionText, questionNum) {
+  if (questionParserPool && questionParserPool.initialized) {
+    try {
+      const result = await questionParserPool.execute({
+        questionText,
+        questionNum,
+        task: 'parseImages'
+      });
+      return result;
+    } catch (err) {
+      console.warn('Worker parsing failed, falling back to sync:', err);
+      return parseImagesInQuestionSync(questionText, questionNum);
+    }
+  }
+  return parseImagesInQuestionSync(questionText, questionNum);
+}
+
+// Batch parse multiple questions using workers
+async function parseQuestionsBatch(questions) {
+  if (questionParserPool && questionParserPool.initialized && questions.length > 1) {
+    try {
+      const questionData = questions.map((q, idx) => ({
+        question: q.question,
+        num: idx + 1
+      }));
+      
+      const results = await questionParserPool.execute({
+        questions: questionData,
+        task: 'parseBatch'
+      });
+      
+      return results;
+    } catch (err) {
+      console.warn('Batch worker parsing failed, falling back to sync:', err);
+    }
+  }
+  
+  // Fallback: process sequentially on main thread
+  return questions.map((q, idx) => ({
+    index: idx,
+    processed: parseImagesInQuestionSync(q.question, idx + 1)
+  }));
 }
 
 function createImageHTML(imageUrl, imageId, questionNum, isDataUri) {
@@ -416,7 +461,7 @@ function markTestCompleted(testName) {
   }
 }
 
-function saveTestState() {
+async function saveTestState() {
   const stateKey = getStateKey();
   if (!stateKey) return;
   
@@ -436,13 +481,28 @@ function saveTestState() {
   };
   
   try {
-    localStorage.setItem(stateKey, JSON.stringify(state));
+    let serialized;
+    if (stateWorkerPool && stateWorkerPool.initialized) {
+      try {
+        serialized = await stateWorkerPool.execute({
+          task: 'serialize',
+          data: state
+        });
+      } catch (err) {
+        console.warn('Worker serialization failed, falling back to sync:', err);
+        serialized = JSON.stringify(state);
+      }
+    } else {
+      serialized = JSON.stringify(state);
+    }
+    
+    localStorage.setItem(stateKey, serialized);
   } catch (err) {
     console.error('Failed to save state:', err);
   }
 }
 
-function loadTestState() {
+async function loadTestState() {
   const stateKey = getStateKey();
   if (!stateKey) return null;
   
@@ -450,7 +510,20 @@ function loadTestState() {
     const saved = localStorage.getItem(stateKey);
     if (!saved) return null;
     
-    const state = JSON.parse(saved);
+    let state;
+    if (stateWorkerPool && stateWorkerPool.initialized) {
+      try {
+        state = await stateWorkerPool.execute({
+          task: 'deserialize',
+          data: saved
+        });
+      } catch (err) {
+        console.warn('Worker deserialization failed, falling back to sync:', err);
+        state = JSON.parse(saved);
+      }
+    } else {
+      state = JSON.parse(saved);
+    }
     
     const hoursSinceSave = (Date.now() - state.timestamp) / (1000 * 60 * 60);
     if (hoursSinceSave > 24) {
@@ -567,14 +640,14 @@ function startTimer(restoreTime = false) {
   timerEl.className = "timer-display-inline";
   timerEl.style.display = "block";
   
-  saveTestState();
+  saveTestState(); // Fire and forget for timer start
   
   timerInterval = setInterval(() => {
     timeLeft--;
     updateTimerDisplay();
     
     if (timeLeft % 10 === 0) {
-      saveTestState();
+      saveTestState(); // Fire and forget for periodic saves
     }
     
     if (timeLeft <= 10 && timeLeft > 0) {
@@ -1041,13 +1114,13 @@ async function cacheImage(imageUrl, loadedUrl) {
     imageCacheSize += dataSize;
     
     if (imageCacheSize > IMAGE_CACHE_MAX_SIZE) {
-      cleanupImageCache();
+      cleanupImageCache(); // Fire and forget
     }
     
     localStorage.setItem(cacheKey, JSON.stringify(cacheData));
   } catch (err) {
     if (err.name === 'QuotaExceededError') {
-      cleanupImageCache();
+      cleanupImageCache(); // Fire and forget
       try {
         const cacheData = {
           loaded: true,
@@ -1064,7 +1137,7 @@ async function cacheImage(imageUrl, loadedUrl) {
   }
 }
 
-function cleanupImageCache() {
+async function cleanupImageCache() {
   try {
     const keys = Object.keys(localStorage);
     const cacheKeys = keys.filter(k => k.startsWith('img_cache_'));
@@ -1077,11 +1150,27 @@ function cleanupImageCache() {
       }
     });
     
-    cacheEntries.sort((a, b) => a.expiry - b.expiry);
+    let keysToRemove;
+    if (stateWorkerPool && stateWorkerPool.initialized && cacheEntries.length > 10) {
+      try {
+        keysToRemove = await stateWorkerPool.execute({
+          task: 'cleanupCache',
+          data: { cacheEntries }
+        });
+      } catch (err) {
+        console.warn('Worker cache cleanup failed, falling back to sync:', err);
+        cacheEntries.sort((a, b) => a.expiry - b.expiry);
+        const toRemove = Math.floor(cacheEntries.length * 0.3);
+        keysToRemove = cacheEntries.slice(0, toRemove).map(entry => entry.key);
+      }
+    } else {
+      cacheEntries.sort((a, b) => a.expiry - b.expiry);
+      const toRemove = Math.floor(cacheEntries.length * 0.3);
+      keysToRemove = cacheEntries.slice(0, toRemove).map(entry => entry.key);
+    }
     
-    const toRemove = Math.floor(cacheEntries.length * 0.3);
-    for (let i = 0; i < toRemove; i++) {
-      localStorage.removeItem(cacheEntries[i].key);
+    for (const key of keysToRemove) {
+      localStorage.removeItem(key);
     }
     
     imageCacheSize = 0;
@@ -1278,7 +1367,7 @@ async function loadQuestions(stationNumber) {
 
   fetch(`https://barry-proxy2.kimethan572.workers.dev?test=${userCredentials.test}&station=${stationNumber}`)
     .then(res => res.json())
-    .then(data => {
+    .then(async data => {
       if (!data.length) {
         form.innerHTML = '<div class="card"><p class="text-center">No questions found for this station.</p></div>';
         isLoading = false;
@@ -1288,7 +1377,7 @@ async function loadQuestions(stationNumber) {
 
       currentQuestions = data;
       
-      const questionSavedState = loadTestState();
+      const questionSavedState = await loadTestState();
       if (questionSavedState && questionSavedState.currentStation === stationNumber) {
         questionStates = questionSavedState.questionStates || {};
         currentQuestionNum = questionSavedState.currentQuestionNum || 1;
@@ -1304,7 +1393,7 @@ async function loadQuestions(stationNumber) {
           if (timeAway > 0) {
             totalOutOfBrowserTime += timeAway;
             lastPageLeaveTime = null;
-            saveTestState();
+            await saveTestState();
           }
         }
       } else {
@@ -1317,6 +1406,9 @@ async function loadQuestions(stationNumber) {
       
       form.innerHTML = "";
 
+      // Process questions in batch using workers if available
+      const processedQuestions = await parseQuestionsBatch(data);
+
       data.forEach((q, idx) => {
         const num = idx + 1;
         const div = document.createElement("div");
@@ -1327,7 +1419,9 @@ async function loadQuestions(stationNumber) {
         div.id = `question-${num}`;
         div.setAttribute('data-question-number', num);
 
-        const questionHTML = parseImagesInQuestion(q.question, num);
+        // Use pre-processed result from worker if available
+        const processedResult = processedQuestions.find(p => p.index === idx);
+        const questionHTML = processedResult ? processedResult.processed : parseImagesInQuestionSync(q.question, num);
 
         const questionContent = document.createElement('div');
         questionContent.classList.add('question-content');
@@ -1418,7 +1512,7 @@ async function loadQuestions(stationNumber) {
       
       updateOutOfBrowserTimeDisplay();
       
-      const stationSavedState = loadTestState();
+      const stationSavedState = await loadTestState();
       const shouldRestore = stationSavedState && stationSavedState.currentStation === currentStation && stationSavedState.timerStartTime;
       if (shouldRestore && stationSavedState.timerStartTime) {
         timerStartTime = stationSavedState.timerStartTime;
@@ -1524,7 +1618,7 @@ async function handleNextStation(isAutoAdvance=false) {
       return;
     }
     
-    const savedState = loadTestState();
+    const savedState = await loadTestState();
     if (savedState && savedState.userCredentials.test === userCredentials.test) {
       if (isTestCompleted(savedState.userCredentials.test)) {
         clearTestState();
@@ -1779,7 +1873,7 @@ document.addEventListener('mousedown', () => {
 async function initializeTestState() {
   await getUserIP();
   
-  const savedState = loadTestState();
+  const savedState = await loadTestState();
   if (savedState && savedState.userCredentials) {
     if (isTestCompleted(savedState.userCredentials.test)) {
       clearTestState();
