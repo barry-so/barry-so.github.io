@@ -50,11 +50,36 @@ function throttle(func, limit) {
 }
 
 function parseImagesInQuestion(questionText, questionNum) {
+  console.log(`parseImagesInQuestion called for question ${questionNum}`);
+  console.log(`Question text length: ${questionText?.length || 0}`);
+  console.log(`Question text preview: ${questionText?.substring(0, 200) || 'null/undefined'}`);
+  
   const dataUriPattern = /(data:image\/[^;]+;base64,[^\s<>"']+)/gi;
+  // More flexible URL pattern - matches URLs that might be images (with or without extensions)
   const urlPattern = /(https?:\/\/[^\s<>"']+\.(jpg|jpeg|png|gif|webp|svg|bmp)(\?[^\s<>"']*)?)/gi;
+  // Also try to match any http/https URL that might be an image (more permissive)
+  const urlPatternPermissive = /(https?:\/\/[^\s<>"']+)/gi;
+  
+  if (!questionText || typeof questionText !== 'string') {
+    console.warn(`Question ${questionNum} has invalid text:`, questionText);
+    return questionText || '';
+  }
+  
+  // Check if question already contains HTML img tags
+  const hasImgTags = /<img[^>]*>/i.test(questionText);
+  if (hasImgTags) {
+    console.log(`Question ${questionNum} already contains <img> tags, skipping image parsing`);
+    return questionText;
+  }
   
   let processedText = questionText;
   let imageCounter = 0;
+  
+  // Check for base64 images
+  const base64Matches = questionText.match(dataUriPattern);
+  if (base64Matches) {
+    console.log(`Found ${base64Matches.length} base64 image(s) in question ${questionNum}`);
+  }
   
   processedText = processedText.replace(dataUriPattern, (match) => {
     imageCounter++;
@@ -63,12 +88,24 @@ function parseImagesInQuestion(questionText, questionNum) {
     return createImageHTML(match, imageId, questionNum, true);
   });
   
+  // Check for URL images
+  const urlMatches = questionText.match(urlPattern);
+  if (urlMatches) {
+    console.log(`Found ${urlMatches.length} URL image(s) in question ${questionNum}:`, urlMatches);
+  }
+  
   processedText = processedText.replace(urlPattern, (match) => {
     imageCounter++;
     const imageId = `img-${questionNum}-${Date.now()}-${imageCounter}`;
     console.log(`Found URL image in question ${questionNum}:`, match);
     return createImageHTML(match, imageId, questionNum, false);
   });
+  
+  if (imageCounter === 0) {
+    console.log(`No images found in question ${questionNum}. Full text:`, questionText);
+  } else {
+    console.log(`Processed ${imageCounter} image(s) in question ${questionNum}`);
+  }
   
   return processedText;
 }
@@ -1250,6 +1287,7 @@ async function loadQuestions(stationNumber) {
   fetch(`https://barry-proxy2.kimethan572.workers.dev?test=${userCredentials.test}&station=${stationNumber}`)
     .then(res => res.json())
     .then(data => {
+      console.log(`Loaded questions for station ${stationNumber}:`, data);
       if (!data.length) {
         form.innerHTML = '<div class="card"><p class="text-center">No questions found for this station.</p></div>';
         isLoading = false;
@@ -1258,6 +1296,7 @@ async function loadQuestions(stationNumber) {
       }
 
       currentQuestions = data;
+      console.log(`Processing ${data.length} questions`);
       
       const questionSavedState = loadTestState();
       if (questionSavedState && questionSavedState.currentStation === stationNumber) {
@@ -1290,6 +1329,13 @@ async function loadQuestions(stationNumber) {
 
       data.forEach((q, idx) => {
         const num = idx + 1;
+        console.log(`Processing question ${num}:`, {
+          hasQuestion: !!q.question,
+          questionType: typeof q.question,
+          questionLength: q.question?.length,
+          questionPreview: q.question?.substring(0, 100)
+        });
+        
         const div = document.createElement("div");
         div.classList.add("question");
         if (num === 1) {
