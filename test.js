@@ -76,29 +76,36 @@ function createImageHTML(imageUrl, imageId, questionNum, isDataUri) {
     ? 'The image data may be invalid or corrupted.' 
     : 'The image may be blocked by CORS restrictions, unavailable, or the URL may be invalid.';
   
-  const isCached = getCachedImageUrl(imageUrl, isDataUri) !== null;
-  const useLazyLoading = !isDataUri;
-  
-  // For external URLs, use the Worker proxy to convert to base64
-  const finalUrl = isDataUri ? imageUrl : `proxy:${imageUrl}`;
-  
-  // Only use native lazy loading when there's an actual src attribute
-  // Custom lazy loading (data-src) should not have loading="lazy" to avoid conflicts
-  const hasSrc = !(useLazyLoading && !isCached);
-  const lazyAttr = hasSrc ? 'loading="lazy"' : '';
-  
-  return `
-    <div class="question-image-container" id="${imageId}" data-image-url="${imageUrl}" data-is-data-uri="${isDataUri}">
-      <img class="question-image lazy-image" 
-           ${hasSrc ? `src="${finalUrl}"` : `data-src="${finalUrl}"`}
-           alt="Question ${questionNum} image" 
-           ${lazyAttr}
-           style="display: none;"
-           onload="handleImageLoad(this)"
-           onerror="handleImageError(this)">
-      <div class="image-loading">Loading image...</div>
-      <div class="image-error" style="display: none;">Failed to load image. ${errorMsg}</div>
-    </div>`;
+  // Base64 images: load immediately with src, no lazy loading
+  // URL images: always use data-src for custom lazy loading (never set src="proxy:...")
+  if (isDataUri) {
+    // Base64 data URI - load immediately, explicitly set loading="eager" to prevent browser lazy loading
+    return `
+      <div class="question-image-container" id="${imageId}" data-image-url="${imageUrl}" data-is-data-uri="true">
+        <img class="question-image" 
+             src="${imageUrl}"
+             alt="Question ${questionNum} image" 
+             loading="eager"
+             style="display: none;"
+             onload="handleImageLoad(this)"
+             onerror="handleImageError(this)">
+        <div class="image-loading">Loading image...</div>
+        <div class="image-error" style="display: none;">Failed to load image. ${errorMsg}</div>
+      </div>`;
+  } else {
+    // External URL - use custom lazy loading with proxy
+    return `
+      <div class="question-image-container" id="${imageId}" data-image-url="${imageUrl}" data-is-data-uri="false">
+        <img class="question-image lazy-image" 
+             data-src="proxy:${imageUrl}"
+             alt="Question ${questionNum} image" 
+             style="display: none;"
+             onload="handleImageLoad(this)"
+             onerror="handleImageError(this)">
+        <div class="image-loading">Loading image...</div>
+        <div class="image-error" style="display: none;">Failed to load image. ${errorMsg}</div>
+      </div>`;
+  }
 }
 
 function handleImageLoad(img) {
@@ -1298,13 +1305,39 @@ async function loadQuestions(stationNumber) {
       });
 
       setTimeout(() => {
+        // Check for base64 images that may have already loaded (browser may defer load events)
         const images = form.querySelectorAll('.question-image');
         images.forEach(img => {
-          if (img.complete && img.naturalHeight !== 0) {
-            handleImageLoad(img);
+          // Base64 images have src set directly and should load immediately
+          // URL images use data-src and are handled by lazy loading
+          if (img.src && !img.getAttribute('data-src')) {
+            if (img.complete) {
+              if (img.naturalHeight !== 0) {
+                // Image loaded successfully
+                handleImageLoad(img);
+              } else {
+                // Image failed to load
+                handleImageError(img);
+              }
+            }
           }
         });
         setupLazyImageLoading();
+        
+        // Fallback check for base64 images after a longer delay (in case browser deferred load event)
+        setTimeout(() => {
+          const base64Images = form.querySelectorAll('.question-image[src]:not([data-src])');
+          base64Images.forEach(img => {
+            if (img.complete && img.naturalHeight !== 0) {
+              const container = img.parentElement;
+              const loading = container?.querySelector('.image-loading');
+              if (loading && loading.style.display !== 'none') {
+                // Image loaded but handler wasn't called - trigger it manually
+                handleImageLoad(img);
+              }
+            }
+          });
+        }, 500);
       }, 100);
 
       trackQuestionStates();
