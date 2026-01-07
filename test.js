@@ -72,21 +72,21 @@ function parseImagesInQuestion(questionText, questionNum) {
 }
 
 function createImageHTML(imageUrl, imageId, questionNum, isDataUri) {
-  const corsAttrs = isDataUri ? '' : 'crossorigin="anonymous" referrerpolicy="no-referrer"';
   const errorMsg = isDataUri 
     ? 'The image data may be invalid or corrupted.' 
     : 'The image may be blocked by CORS restrictions, unavailable, or the URL may be invalid.';
   
   const isCached = getCachedImageUrl(imageUrl, isDataUri) !== null;
   const useLazyLoading = !isDataUri;
-  const finalUrl = imageUrl;
+  
+  // For external URLs, use the Worker proxy to convert to base64
+  const finalUrl = isDataUri ? imageUrl : `proxy:${imageUrl}`;
   
   return `
     <div class="question-image-container" id="${imageId}" data-image-url="${imageUrl}" data-is-data-uri="${isDataUri}">
       <img class="question-image lazy-image" 
            ${useLazyLoading && !isCached ? `data-src="${finalUrl}"` : `src="${finalUrl}"`}
            alt="Question ${questionNum} image" 
-           ${corsAttrs}
            loading="lazy"
            style="display: none;"
            onload="handleImageLoad(this)"
@@ -125,6 +125,23 @@ function handleImageError(img) {
   if (imageUrl && dataSrc && img.src !== dataSrc) {
     img.src = dataSrc;
   }
+}
+
+async function loadImageViaProxy(imageUrl) {
+  try {
+    const response = await fetch(`https://barry-proxy2.kimethan572.workers.dev/?imageUrl=${encodeURIComponent(imageUrl)}`);
+    const data = await response.json();
+    
+    if (data.base64) {
+      return data.base64;
+    }
+    if (data.error) {
+      console.error('Proxy error:', data.error);
+    }
+  } catch (err) {
+    console.error('Failed to load image via proxy:', err);
+  }
+  return null;
 }
 
 function loadTestList() {
@@ -796,16 +813,33 @@ function setupLazyImageLoading() {
   };
 
   imageObserver = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
+    entries.forEach(async (entry) => {
       if (entry.isIntersecting) {
         const img = entry.target;
         const dataSrc = img.getAttribute('data-src');
+        
         if (dataSrc && !img.src) {
-          img.src = dataSrc;
-          img.removeAttribute('data-src');
           const container = img.parentElement;
           const loading = container.querySelector('.image-loading');
           if (loading) loading.style.display = 'block';
+          
+          // Check if this is a proxied URL
+          if (dataSrc.startsWith('proxy:')) {
+            const originalUrl = dataSrc.substring(6); // Remove 'proxy:' prefix
+            const base64Data = await loadImageViaProxy(originalUrl);
+            
+            if (base64Data) {
+              img.src = base64Data;
+            } else {
+              // Fallback to direct load (will likely fail but worth trying)
+              img.src = originalUrl;
+            }
+          } else {
+            // Direct data URI or already processed URL
+            img.src = dataSrc;
+          }
+          
+          img.removeAttribute('data-src');
         }
         imageObserver.unobserve(img);
       }
@@ -840,7 +874,8 @@ function unloadDistantImages() {
       
       if (!isDataUri && imageUrl && img.complete) {
         img.src = '';
-        img.setAttribute('data-src', imageUrl);
+        // Mark for proxy loading when it comes back into view
+        img.setAttribute('data-src', `proxy:${imageUrl}`);
         img.style.display = 'none';
         const loading = container.querySelector('.image-loading');
         if (loading) loading.style.display = 'block';
