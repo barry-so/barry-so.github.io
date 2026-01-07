@@ -82,12 +82,17 @@ function createImageHTML(imageUrl, imageId, questionNum, isDataUri) {
   // For external URLs, use the Worker proxy to convert to base64
   const finalUrl = isDataUri ? imageUrl : `proxy:${imageUrl}`;
   
+  // Only use native lazy loading when there's an actual src attribute
+  // Custom lazy loading (data-src) should not have loading="lazy" to avoid conflicts
+  const hasSrc = !(useLazyLoading && !isCached);
+  const lazyAttr = hasSrc ? 'loading="lazy"' : '';
+  
   return `
     <div class="question-image-container" id="${imageId}" data-image-url="${imageUrl}" data-is-data-uri="${isDataUri}">
       <img class="question-image lazy-image" 
-           ${useLazyLoading && !isCached ? `data-src="${finalUrl}"` : `src="${finalUrl}"`}
+           ${hasSrc ? `src="${finalUrl}"` : `data-src="${finalUrl}"`}
            alt="Question ${questionNum} image" 
-           loading="lazy"
+           ${lazyAttr}
            style="display: none;"
            onload="handleImageLoad(this)"
            onerror="handleImageError(this)">
@@ -129,19 +134,59 @@ function handleImageError(img) {
 
 async function loadImageViaProxy(imageUrl) {
   try {
-    const response = await fetch(`https://barry-proxy2.kimethan572.workers.dev/?imageUrl=${encodeURIComponent(imageUrl)}`);
+    const proxyUrl = `https://barry-proxy2.kimethan572.workers.dev/?imageUrl=${encodeURIComponent(imageUrl)}`;
+    const response = await fetch(proxyUrl);
+    
+    if (!response.ok) {
+      console.error(`Proxy returned error status: ${response.status} ${response.statusText}`);
+      const contentType = response.headers.get('Content-Type') || '';
+      let errorData;
+      
+      if (contentType.includes('application/json')) {
+        try {
+          errorData = await response.json();
+        } catch {
+          errorData = { error: `HTTP ${response.status}` };
+        }
+      } else {
+        const errorText = await response.text();
+        errorData = { error: errorText || `HTTP ${response.status}` };
+      }
+      
+      console.error('Proxy error details:', errorData);
+      return null;
+    }
+    
+    // Check if response is JSON
+    const contentType = response.headers.get('Content-Type') || '';
+    if (!contentType.includes('application/json')) {
+      console.error('Proxy returned non-JSON response. Content-Type:', contentType);
+      return null;
+    }
+    
     const data = await response.json();
     
     if (data.base64) {
       return data.base64;
     }
+    
     if (data.error) {
       console.error('Proxy error:', data.error);
+      return null;
     }
+    
+    console.warn('Proxy response missing base64 field:', data);
+    return null;
   } catch (err) {
     console.error('Failed to load image via proxy:', err);
+    console.error('Image URL was:', imageUrl);
+    console.error('Error details:', {
+      name: err.name,
+      message: err.message,
+      stack: err.stack
+    });
+    return null;
   }
-  return null;
 }
 
 function loadTestList() {
@@ -830,16 +875,18 @@ function setupLazyImageLoading() {
             
             if (base64Data) {
               img.src = base64Data;
+              img.removeAttribute('data-src');
             } else {
-              // Fallback to direct load (will likely fail but worth trying)
-              img.src = originalUrl;
+              // Proxy failed - trigger error handler
+              img.removeAttribute('data-src');
+              handleImageError(img);
+              return; // Don't continue processing this image
             }
           } else {
             // Direct data URI or already processed URL
             img.src = dataSrc;
+            img.removeAttribute('data-src');
           }
-          
-          img.removeAttribute('data-src');
         }
         imageObserver.unobserve(img);
       }
@@ -874,6 +921,8 @@ function unloadDistantImages() {
       
       if (!isDataUri && imageUrl && img.complete) {
         img.src = '';
+        // Remove native lazy loading attribute when switching to custom lazy loading
+        img.removeAttribute('loading');
         // Mark for proxy loading when it comes back into view
         img.setAttribute('data-src', `proxy:${imageUrl}`);
         img.style.display = 'none';
