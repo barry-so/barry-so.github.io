@@ -59,12 +59,14 @@ function parseImagesInQuestion(questionText, questionNum) {
   processedText = processedText.replace(dataUriPattern, (match) => {
     imageCounter++;
     const imageId = `img-${questionNum}-${Date.now()}-${imageCounter}`;
+    console.log(`Found base64 image in question ${questionNum}, creating image element`);
     return createImageHTML(match, imageId, questionNum, true);
   });
   
   processedText = processedText.replace(urlPattern, (match) => {
     imageCounter++;
     const imageId = `img-${questionNum}-${Date.now()}-${imageCounter}`;
+    console.log(`Found URL image in question ${questionNum}:`, match);
     return createImageHTML(match, imageId, questionNum, false);
   });
   
@@ -109,15 +111,16 @@ function createImageHTML(imageUrl, imageId, questionNum, isDataUri) {
 }
 
 function handleImageLoad(img) {
+  console.log('handleImageLoad called for image:', img.src?.substring(0, 50) || 'no src');
   img.style.display = 'block';
   const container = img.parentElement;
-  const loading = container.querySelector('.image-loading');
-  const error = container.querySelector('.image-error');
+  const loading = container?.querySelector('.image-loading');
+  const error = container?.querySelector('.image-error');
   if (loading) loading.style.display = 'none';
   if (error) error.style.display = 'none';
   
-  const imageUrl = container.getAttribute('data-image-url');
-  const isDataUri = container.getAttribute('data-is-data-uri') === 'true';
+  const imageUrl = container?.getAttribute('data-image-url');
+  const isDataUri = container?.getAttribute('data-is-data-uri') === 'true';
   
   if (imageUrl && !isDataUri && img.complete) {
     cacheImage(imageUrl, img.src);
@@ -125,16 +128,18 @@ function handleImageLoad(img) {
 }
 
 function handleImageError(img) {
+  console.error('handleImageError called for image:', img.src?.substring(0, 50) || img.getAttribute('data-src') || 'no src');
   img.style.display = 'none';
   const container = img.parentElement;
-  const loading = container.querySelector('.image-loading');
-  const error = container.querySelector('.image-error');
+  const loading = container?.querySelector('.image-loading');
+  const error = container?.querySelector('.image-error');
   if (loading) loading.style.display = 'none';
   if (error) error.style.display = 'block';
   
-  const imageUrl = container.getAttribute('data-image-url');
+  const imageUrl = container?.getAttribute('data-image-url');
   const dataSrc = img.getAttribute('data-src');
-  if (imageUrl && dataSrc && img.src !== dataSrc) {
+  // Don't retry with data-src if it's a proxy URL (would cause infinite loop)
+  if (imageUrl && dataSrc && !dataSrc.startsWith('proxy:') && img.src !== dataSrc) {
     img.src = dataSrc;
   }
 }
@@ -864,44 +869,73 @@ function setupLazyImageLoading() {
     threshold: 0.01
   };
 
+  // Function to load a single image
+  const loadImage = async (img) => {
+    const dataSrc = img.getAttribute('data-src');
+    if (!dataSrc || img.src) return; // Already loading or loaded
+    
+    const container = img.parentElement;
+    const loading = container?.querySelector('.image-loading');
+    if (loading) loading.style.display = 'block';
+    
+    // Check if this is a proxied URL
+    if (dataSrc.startsWith('proxy:')) {
+      const originalUrl = dataSrc.substring(6); // Remove 'proxy:' prefix
+      console.log('Loading image via proxy:', originalUrl);
+      const base64Data = await loadImageViaProxy(originalUrl);
+      
+      if (base64Data) {
+        console.log('Proxy returned base64, setting image src');
+        img.src = base64Data;
+        img.removeAttribute('data-src');
+        
+        // Check if image loaded immediately (base64 should)
+        setTimeout(() => {
+          if (img.complete && img.naturalHeight !== 0) {
+            // Image loaded but onload might not have fired
+            if (img.style.display === 'none') {
+              handleImageLoad(img);
+            }
+          } else if (img.complete && img.naturalHeight === 0) {
+            // Image failed to load
+            handleImageError(img);
+          }
+        }, 100);
+      } else {
+        // Proxy failed - trigger error handler
+        console.error('Proxy failed to load image:', originalUrl);
+        img.removeAttribute('data-src');
+        handleImageError(img);
+      }
+    } else {
+      // Direct data URI or already processed URL
+      img.src = dataSrc;
+      img.removeAttribute('data-src');
+    }
+  };
+
   imageObserver = new IntersectionObserver((entries) => {
     entries.forEach(async (entry) => {
       if (entry.isIntersecting) {
         const img = entry.target;
-        const dataSrc = img.getAttribute('data-src');
-        
-        if (dataSrc && !img.src) {
-          const container = img.parentElement;
-          const loading = container.querySelector('.image-loading');
-          if (loading) loading.style.display = 'block';
-          
-          // Check if this is a proxied URL
-          if (dataSrc.startsWith('proxy:')) {
-            const originalUrl = dataSrc.substring(6); // Remove 'proxy:' prefix
-            const base64Data = await loadImageViaProxy(originalUrl);
-            
-            if (base64Data) {
-              img.src = base64Data;
-              img.removeAttribute('data-src');
-            } else {
-              // Proxy failed - trigger error handler
-              img.removeAttribute('data-src');
-              handleImageError(img);
-              return; // Don't continue processing this image
-            }
-          } else {
-            // Direct data URI or already processed URL
-            img.src = dataSrc;
-            img.removeAttribute('data-src');
-          }
-        }
+        await loadImage(img);
         imageObserver.unobserve(img);
       }
     });
   }, imageOptions);
 
+  // Load images that are already in viewport immediately
   lazyImages.forEach(img => {
-    imageObserver.observe(img);
+    const rect = img.getBoundingClientRect();
+    const isInViewport = rect.top < window.innerHeight + 200 && rect.bottom > -200;
+    
+    if (isInViewport) {
+      // Image is already in viewport, load it immediately
+      loadImage(img);
+    } else {
+      // Image is not in viewport, observe it for lazy loading
+      imageObserver.observe(img);
+    }
   });
 }
 
@@ -1304,41 +1338,66 @@ async function loadQuestions(stationNumber) {
         form.appendChild(div);
       });
 
+      // Immediately check and load base64 images
+      const base64Images = form.querySelectorAll('.question-image[src]:not([data-src])');
+      base64Images.forEach(img => {
+        const container = img.parentElement;
+        const isDataUri = container?.getAttribute('data-is-data-uri') === 'true';
+        
+        if (isDataUri) {
+          // Base64 image - check if already loaded
+          if (img.complete) {
+            if (img.naturalHeight !== 0) {
+              handleImageLoad(img);
+            } else {
+              handleImageError(img);
+            }
+          }
+          // If not complete, wait for onload/onerror handlers
+        }
+      });
+      
+      // Setup lazy loading for URL images
+      setupLazyImageLoading();
+      
+      // Fallback check for base64 images after delays (in case browser deferred load event)
       setTimeout(() => {
-        // Check for base64 images that may have already loaded (browser may defer load events)
-        const images = form.querySelectorAll('.question-image');
-        images.forEach(img => {
-          // Base64 images have src set directly and should load immediately
-          // URL images use data-src and are handled by lazy loading
-          if (img.src && !img.getAttribute('data-src')) {
-            if (img.complete) {
-              if (img.naturalHeight !== 0) {
-                // Image loaded successfully
-                handleImageLoad(img);
-              } else {
-                // Image failed to load
-                handleImageError(img);
-              }
+        base64Images.forEach(img => {
+          const container = img.parentElement;
+          const isDataUri = container?.getAttribute('data-is-data-uri') === 'true';
+          const loading = container?.querySelector('.image-loading');
+          
+          if (isDataUri && img.complete && img.naturalHeight !== 0) {
+            // Image loaded but handler might not have been called
+            if (loading && loading.style.display !== 'none') {
+              handleImageLoad(img);
+            } else if (img.style.display === 'none') {
+              // Image is loaded but still hidden
+              handleImageLoad(img);
+            }
+          } else if (isDataUri && img.complete && img.naturalHeight === 0) {
+            // Image failed to load
+            if (loading && loading.style.display !== 'none') {
+              handleImageError(img);
             }
           }
         });
-        setupLazyImageLoading();
-        
-        // Fallback check for base64 images after a longer delay (in case browser deferred load event)
-        setTimeout(() => {
-          const base64Images = form.querySelectorAll('.question-image[src]:not([data-src])');
-          base64Images.forEach(img => {
-            if (img.complete && img.naturalHeight !== 0) {
-              const container = img.parentElement;
-              const loading = container?.querySelector('.image-loading');
-              if (loading && loading.style.display !== 'none') {
-                // Image loaded but handler wasn't called - trigger it manually
-                handleImageLoad(img);
-              }
+      }, 200);
+      
+      // Final fallback check
+      setTimeout(() => {
+        base64Images.forEach(img => {
+          const container = img.parentElement;
+          const isDataUri = container?.getAttribute('data-is-data-uri') === 'true';
+          const loading = container?.querySelector('.image-loading');
+          
+          if (isDataUri && img.complete && img.naturalHeight !== 0) {
+            if (loading && loading.style.display !== 'none') {
+              handleImageLoad(img);
             }
-          });
-        }, 500);
-      }, 100);
+          }
+        });
+      }, 1000);
 
       trackQuestionStates();
       restoreAnswers();
