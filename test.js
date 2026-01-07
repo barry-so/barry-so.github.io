@@ -55,9 +55,10 @@ function parseImagesInQuestion(questionText, questionNum) {
   console.log(`Question text preview: ${questionText?.substring(0, 200) || 'null/undefined'}`);
   
   const dataUriPattern = /(data:image\/[^;]+;base64,[^\s<>"']+)/gi;
-  // More flexible URL pattern - matches URLs that might be images (with or without extensions)
-  const urlPattern = /(https?:\/\/[^\s<>"']+\.(jpg|jpeg|png|gif|webp|svg|bmp)(\?[^\s<>"']*)?)/gi;
-  // Also try to match any http/https URL that might be an image (more permissive)
+  // URL pattern with file extensions
+  const urlPatternWithExt = /(https?:\/\/[^\s<>"']+\.(jpg|jpeg|png|gif|webp|svg|bmp)(\?[^\s<>"']*)?)/gi;
+  // More permissive pattern for URLs that might be images (no extension required)
+  // This matches URLs that are likely images based on common image hosting domains or patterns
   const urlPatternPermissive = /(https?:\/\/[^\s<>"']+)/gi;
   
   if (!questionText || typeof questionText !== 'string') {
@@ -88,18 +89,55 @@ function parseImagesInQuestion(questionText, questionNum) {
     return createImageHTML(match, imageId, questionNum, true);
   });
   
-  // Check for URL images
-  const urlMatches = questionText.match(urlPattern);
-  if (urlMatches) {
-    console.log(`Found ${urlMatches.length} URL image(s) in question ${questionNum}:`, urlMatches);
+  // Check for URL images with extensions first
+  const urlMatchesWithExt = questionText.match(urlPatternWithExt);
+  if (urlMatchesWithExt) {
+    console.log(`Found ${urlMatchesWithExt.length} URL image(s) with extension in question ${questionNum}:`, urlMatchesWithExt);
   }
   
-  processedText = processedText.replace(urlPattern, (match) => {
+  processedText = processedText.replace(urlPatternWithExt, (match) => {
     imageCounter++;
     const imageId = `img-${questionNum}-${Date.now()}-${imageCounter}`;
-    console.log(`Found URL image in question ${questionNum}:`, match);
+    console.log(`Found URL image with extension in question ${questionNum}:`, match);
     return createImageHTML(match, imageId, questionNum, false);
   });
+  
+  // Check if the entire question text is just a URL (no extension, but likely an image)
+  // This handles cases where the question text IS the image URL
+  const trimmedText = questionText.trim();
+  const isEntireTextUrl = /^https?:\/\/[^\s<>"']+$/i.test(trimmedText);
+  
+  if (isEntireTextUrl && imageCounter === 0) {
+    // The entire question is a URL without extension - treat it as an image
+    console.log(`Entire question ${questionNum} is a URL (likely image):`, trimmedText);
+    imageCounter++;
+    const imageId = `img-${questionNum}-${Date.now()}-${imageCounter}`;
+    return createImageHTML(trimmedText, imageId, questionNum, false);
+  }
+  
+  // Also check for URLs without extensions within text (but be more careful)
+  // Only match if we haven't already processed this as an image
+  if (imageCounter === 0) {
+    const urlMatchesPermissive = questionText.match(urlPatternPermissive);
+    if (urlMatchesPermissive) {
+      console.log(`Found ${urlMatchesPermissive.length} potential URL image(s) without extension in question ${questionNum}:`, urlMatchesPermissive);
+      // Only process the first URL if the text is mostly just that URL
+      // This prevents matching URLs in regular text
+      const firstUrl = urlMatchesPermissive[0];
+      const urlLength = firstUrl.length;
+      const textLength = questionText.length;
+      
+      // If the URL takes up most of the text (80% or more), treat it as an image
+      if (urlLength / textLength >= 0.8) {
+        processedText = processedText.replace(firstUrl, (match) => {
+          imageCounter++;
+          const imageId = `img-${questionNum}-${Date.now()}-${imageCounter}`;
+          console.log(`Treating URL as image in question ${questionNum}:`, match);
+          return createImageHTML(match, imageId, questionNum, false);
+        });
+      }
+    }
+  }
   
   if (imageCounter === 0) {
     console.log(`No images found in question ${questionNum}. Full text:`, questionText);
