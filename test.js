@@ -76,12 +76,10 @@ function parseImagesInQuestion(questionText, questionNum) {
   let processedText = questionText;
   let imageCounter = 0;
   
-  // Check for base64 images
-  const base64Matches = questionText.match(dataUriPattern);
-  if (base64Matches) {
-    console.log(`Found ${base64Matches.length} base64 image(s) in question ${questionNum}`);
-  }
-  
+  // Process base64 images
+  // replace() automatically preserves text before and after the match
+  // Example: "Text before data:image/jpeg;base64,... text after" 
+  //          becomes "Text before <img> text after"
   processedText = processedText.replace(dataUriPattern, (match) => {
     imageCounter++;
     const imageId = `img-${questionNum}-${Date.now()}-${imageCounter}`;
@@ -89,12 +87,10 @@ function parseImagesInQuestion(questionText, questionNum) {
     return createImageHTML(match, imageId, questionNum, true);
   });
   
-  // Check for URL images with extensions first
-  const urlMatchesWithExt = questionText.match(urlPatternWithExt);
-  if (urlMatchesWithExt) {
-    console.log(`Found ${urlMatchesWithExt.length} URL image(s) with extension in question ${questionNum}:`, urlMatchesWithExt);
-  }
-  
+  // Process URL images with extensions
+  // replace() automatically preserves text before and after the match
+  // Example: "Text before https://image.jpg text after"
+  //          becomes "Text before <img> text after"
   processedText = processedText.replace(urlPatternWithExt, (match) => {
     imageCounter++;
     const imageId = `img-${questionNum}-${Date.now()}-${imageCounter}`;
@@ -102,41 +98,36 @@ function parseImagesInQuestion(questionText, questionNum) {
     return createImageHTML(match, imageId, questionNum, false);
   });
   
-  // Check if the entire question text is just a URL (no extension, but likely an image)
-  // This handles cases where the question text IS the image URL
-  const trimmedText = questionText.trim();
-  const isEntireTextUrl = /^https?:\/\/[^\s<>"']+$/i.test(trimmedText);
-  
-  if (isEntireTextUrl && imageCounter === 0) {
-    // The entire question is a URL without extension - treat it as an image
-    console.log(`Entire question ${questionNum} is a URL (likely image):`, trimmedText);
-    imageCounter++;
-    const imageId = `img-${questionNum}-${Date.now()}-${imageCounter}`;
-    return createImageHTML(trimmedText, imageId, questionNum, false);
-  }
-  
-  // Also check for URLs without extensions within text (but be more careful)
-  // Only match if we haven't already processed this as an image
+  // Check for URLs without extensions (only if no images found yet)
+  // This handles URLs that might be images but don't have file extensions
+  // replace() automatically preserves text before and after the URL
+  // Example: "Text before https://image.com/path text after"
+  //          becomes "Text before <img> text after"
   if (imageCounter === 0) {
-    const urlMatchesPermissive = questionText.match(urlPatternPermissive);
-    if (urlMatchesPermissive) {
-      console.log(`Found ${urlMatchesPermissive.length} potential URL image(s) without extension in question ${questionNum}:`, urlMatchesPermissive);
-      // Only process the first URL if the text is mostly just that URL
-      // This prevents matching URLs in regular text
-      const firstUrl = urlMatchesPermissive[0];
-      const urlLength = firstUrl.length;
+    // Use replace() with a function to process all matching URLs
+    // This preserves text before/after each URL and handles multiple URLs
+    processedText = processedText.replace(urlPatternPermissive, (urlMatch) => {
+      const urlLength = urlMatch.length;
       const textLength = questionText.length;
+      const urlRatio = urlLength / textLength;
       
-      // If the URL takes up most of the text (80% or more), treat it as an image
-      if (urlLength / textLength >= 0.8) {
-        processedText = processedText.replace(firstUrl, (match) => {
-          imageCounter++;
-          const imageId = `img-${questionNum}-${Date.now()}-${imageCounter}`;
-          console.log(`Treating URL as image in question ${questionNum}:`, match);
-          return createImageHTML(match, imageId, questionNum, false);
-        });
+      // Check if URL is standalone (with optional whitespace) or takes up 80%+ of text
+      const trimmedUrl = urlMatch.trim();
+      const trimmedText = questionText.trim();
+      const isStandaloneUrl = trimmedText === trimmedUrl || 
+                             new RegExp(`^\\s*${trimmedUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`, 'i').test(questionText);
+      const isLargeUrl = urlRatio >= 0.8;
+      
+      if (isStandaloneUrl || isLargeUrl) {
+        imageCounter++;
+        const imageId = `img-${questionNum}-${Date.now()}-${imageCounter}`;
+        console.log(`Treating URL as image in question ${questionNum}${isStandaloneUrl ? ' (standalone)' : ` (${Math.round(urlRatio*100)}% of text)`}:`, urlMatch);
+        // Return image HTML - replace() preserves text before/after automatically
+        return createImageHTML(urlMatch, imageId, questionNum, false);
       }
-    }
+      // Return original URL if it doesn't meet criteria (preserves it in text)
+      return urlMatch;
+    });
   }
   
   if (imageCounter === 0) {
@@ -210,23 +201,16 @@ function handleImageError(img) {
   const error = container?.querySelector('.image-error');
   if (loading) loading.style.display = 'none';
   if (error) error.style.display = 'block';
-  
-  const imageUrl = container?.getAttribute('data-image-url');
-  const dataSrc = img.getAttribute('data-src');
-  // Don't retry with data-src if it's a proxy URL (would cause infinite loop)
-  if (imageUrl && dataSrc && !dataSrc.startsWith('proxy:') && img.src !== dataSrc) {
-    img.src = dataSrc;
-  }
 }
 
 async function loadImageViaProxy(imageUrl) {
   try {
     const proxyUrl = `https://barry-proxy2.kimethan572.workers.dev/?imageUrl=${encodeURIComponent(imageUrl)}`;
     const response = await fetch(proxyUrl);
+    const contentType = response.headers.get('Content-Type') || '';
     
     if (!response.ok) {
       console.error(`Proxy returned error status: ${response.status} ${response.statusText}`);
-      const contentType = response.headers.get('Content-Type') || '';
       let errorData;
       
       if (contentType.includes('application/json')) {
@@ -244,8 +228,7 @@ async function loadImageViaProxy(imageUrl) {
       return null;
     }
     
-    // Check if response is JSON
-    const contentType = response.headers.get('Content-Type') || '';
+    // Validate response is JSON
     if (!contentType.includes('application/json')) {
       console.error('Proxy returned non-JSON response. Content-Type:', contentType);
       return null;
@@ -963,19 +946,7 @@ function setupLazyImageLoading() {
         console.log('Proxy returned base64, setting image src');
         img.src = base64Data;
         img.removeAttribute('data-src');
-        
-        // Check if image loaded immediately (base64 should)
-        setTimeout(() => {
-          if (img.complete && img.naturalHeight !== 0) {
-            // Image loaded but onload might not have fired
-            if (img.style.display === 'none') {
-              handleImageLoad(img);
-            }
-          } else if (img.complete && img.naturalHeight === 0) {
-            // Image failed to load
-            handleImageError(img);
-          }
-        }, 100);
+        // onload/onerror handlers will handle display - no need for setTimeout check
       } else {
         // Proxy failed - trigger error handler
         console.error('Proxy failed to load image:', originalUrl);
@@ -1422,66 +1393,39 @@ async function loadQuestions(stationNumber) {
         form.appendChild(div);
       });
 
-      // Immediately check and load base64 images
-      const base64Images = form.querySelectorAll('.question-image[src]:not([data-src])');
-      base64Images.forEach(img => {
-        const container = img.parentElement;
-        const isDataUri = container?.getAttribute('data-is-data-uri') === 'true';
-        
-        if (isDataUri) {
-          // Base64 image - check if already loaded
-          if (img.complete) {
+      // Check and handle base64 images (they load immediately, but browser may defer load events)
+      const checkBase64Images = () => {
+        const base64Images = form.querySelectorAll('.question-image[src]:not([data-src])');
+        base64Images.forEach(img => {
+          const container = img.parentElement;
+          const isDataUri = container?.getAttribute('data-is-data-uri') === 'true';
+          const loading = container?.querySelector('.image-loading');
+          
+          if (isDataUri && img.complete) {
             if (img.naturalHeight !== 0) {
-              handleImageLoad(img);
+              // Image loaded successfully - ensure handler was called
+              if (loading && loading.style.display !== 'none' || img.style.display === 'none') {
+                handleImageLoad(img);
+              }
             } else {
-              handleImageError(img);
+              // Image failed to load
+              if (loading && loading.style.display !== 'none') {
+                handleImageError(img);
+              }
             }
           }
-          // If not complete, wait for onload/onerror handlers
-        }
-      });
+        });
+      };
+      
+      // Check immediately for already-loaded base64 images
+      checkBase64Images();
       
       // Setup lazy loading for URL images
       setupLazyImageLoading();
       
-      // Fallback check for base64 images after delays (in case browser deferred load event)
-      setTimeout(() => {
-        base64Images.forEach(img => {
-          const container = img.parentElement;
-          const isDataUri = container?.getAttribute('data-is-data-uri') === 'true';
-          const loading = container?.querySelector('.image-loading');
-          
-          if (isDataUri && img.complete && img.naturalHeight !== 0) {
-            // Image loaded but handler might not have been called
-            if (loading && loading.style.display !== 'none') {
-              handleImageLoad(img);
-            } else if (img.style.display === 'none') {
-              // Image is loaded but still hidden
-              handleImageLoad(img);
-            }
-          } else if (isDataUri && img.complete && img.naturalHeight === 0) {
-            // Image failed to load
-            if (loading && loading.style.display !== 'none') {
-              handleImageError(img);
-            }
-          }
-        });
-      }, 200);
-      
-      // Final fallback check
-      setTimeout(() => {
-        base64Images.forEach(img => {
-          const container = img.parentElement;
-          const isDataUri = container?.getAttribute('data-is-data-uri') === 'true';
-          const loading = container?.querySelector('.image-loading');
-          
-          if (isDataUri && img.complete && img.naturalHeight !== 0) {
-            if (loading && loading.style.display !== 'none') {
-              handleImageLoad(img);
-            }
-          }
-        });
-      }, 1000);
+      // Fallback checks for base64 images (in case browser deferred load events)
+      setTimeout(checkBase64Images, 200);
+      setTimeout(checkBase64Images, 1000);
 
       trackQuestionStates();
       restoreAnswers();
