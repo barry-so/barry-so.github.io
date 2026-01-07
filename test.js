@@ -25,11 +25,29 @@ let questionStates = {};
 let currentQuestionNum = 1;
 let lastAnsweredQuestion = 0;
 let scrollObserver = null;
+let imageObserver = null;
 let userIP = null;
 let timerStartTime = null;
 let savedAnswers = {};
 let totalOutOfBrowserTime = 0;
 let lastPageLeaveTime = null;
+let imageCache = new Map();
+const IMAGE_CACHE_MAX_SIZE = 50 * 1024 * 1024;
+let imageCacheSize = 0;
+let scrollUnloadHandler = null;
+
+function throttle(func, limit) {
+  let inThrottle;
+  return function() {
+    const args = arguments;
+    const context = this;
+    if (!inThrottle) {
+      func.apply(context, args);
+      inThrottle = true;
+      setTimeout(() => inThrottle = false, limit);
+    }
+  };
+}
 
 function parseImagesInQuestion(questionText, questionNum) {
   const dataUriPattern = /(data:image\/[^;]+;base64,[^\s<>"']+)/gi;
@@ -59,13 +77,17 @@ function createImageHTML(imageUrl, imageId, questionNum, isDataUri) {
     ? 'The image data may be invalid or corrupted.' 
     : 'The image may be blocked by CORS restrictions, unavailable, or the URL may be invalid.';
   
+  const isCached = getCachedImageUrl(imageUrl, isDataUri) !== null;
+  const useLazyLoading = !isDataUri;
+  const finalUrl = imageUrl;
+  
   return `
-    <div class="question-image-container" id="${imageId}">
-      <img class="question-image" 
-           src="${imageUrl}" 
+    <div class="question-image-container" id="${imageId}" data-image-url="${imageUrl}" data-is-data-uri="${isDataUri}">
+      <img class="question-image lazy-image" 
+           ${useLazyLoading && !isCached ? `data-src="${finalUrl}"` : `src="${finalUrl}"`}
            alt="Question ${questionNum} image" 
            ${corsAttrs}
-           loading="eager"
+           loading="lazy"
            style="display: none;"
            onload="handleImageLoad(this)"
            onerror="handleImageError(this)">
@@ -81,6 +103,13 @@ function handleImageLoad(img) {
   const error = container.querySelector('.image-error');
   if (loading) loading.style.display = 'none';
   if (error) error.style.display = 'none';
+  
+  const imageUrl = container.getAttribute('data-image-url');
+  const isDataUri = container.getAttribute('data-is-data-uri') === 'true';
+  
+  if (imageUrl && !isDataUri && img.complete) {
+    cacheImage(imageUrl, img.src);
+  }
 }
 
 function handleImageError(img) {
@@ -90,6 +119,12 @@ function handleImageError(img) {
   const error = container.querySelector('.image-error');
   if (loading) loading.style.display = 'none';
   if (error) error.style.display = 'block';
+  
+  const imageUrl = container.getAttribute('data-image-url');
+  const dataSrc = img.getAttribute('data-src');
+  if (imageUrl && dataSrc && img.src !== dataSrc) {
+    img.src = dataSrc;
+  }
 }
 
 function loadTestList() {
@@ -746,6 +781,161 @@ function setupScrollTracking() {
   });
 }
 
+function setupLazyImageLoading() {
+  if (imageObserver) {
+    imageObserver.disconnect();
+  }
+
+  const lazyImages = form.querySelectorAll('.lazy-image[data-src]');
+  if (lazyImages.length === 0) return;
+
+  const imageOptions = {
+    root: null,
+    rootMargin: '200px 0px',
+    threshold: 0.01
+  };
+
+  imageObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const img = entry.target;
+        const dataSrc = img.getAttribute('data-src');
+        if (dataSrc && !img.src) {
+          img.src = dataSrc;
+          img.removeAttribute('data-src');
+          const container = img.parentElement;
+          const loading = container.querySelector('.image-loading');
+          if (loading) loading.style.display = 'block';
+        }
+        imageObserver.unobserve(img);
+      }
+    });
+  }, imageOptions);
+
+  lazyImages.forEach(img => {
+    imageObserver.observe(img);
+  });
+}
+
+function unloadDistantImages() {
+  const allImages = form.querySelectorAll('.question-image');
+  if (allImages.length === 0) return;
+  
+  const viewportTop = window.scrollY;
+  const viewportBottom = viewportTop + window.innerHeight;
+  const unloadDistance = window.innerHeight * 3;
+
+  allImages.forEach(img => {
+    const rect = img.getBoundingClientRect();
+    const imageTop = viewportTop + rect.top;
+    const imageBottom = imageTop + rect.height;
+    
+    const isFarAbove = imageBottom < viewportTop - unloadDistance;
+    const isFarBelow = imageTop > viewportBottom + unloadDistance;
+    
+    if ((isFarAbove || isFarBelow) && img.src && !img.getAttribute('data-src')) {
+      const container = img.parentElement;
+      const imageUrl = container.getAttribute('data-image-url');
+      const isDataUri = container.getAttribute('data-is-data-uri') === 'true';
+      
+      if (!isDataUri && imageUrl && img.complete) {
+        img.src = '';
+        img.setAttribute('data-src', imageUrl);
+        img.style.display = 'none';
+        const loading = container.querySelector('.image-loading');
+        if (loading) loading.style.display = 'block';
+        if (imageObserver) {
+          imageObserver.observe(img);
+        }
+      }
+    }
+  });
+}
+
+function getCachedImageUrl(imageUrl, isDataUri) {
+  if (isDataUri || !imageUrl) return null;
+  
+  const cacheKey = `img_cache_${btoa(imageUrl).substring(0, 100)}`;
+  try {
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      const cacheData = JSON.parse(cached);
+      if (cacheData.expiry > Date.now() && cacheData.loaded) {
+        return imageUrl;
+      } else {
+        localStorage.removeItem(cacheKey);
+      }
+    }
+  } catch (err) {
+    console.error('Cache read error:', err);
+  }
+  return null;
+}
+
+async function cacheImage(imageUrl, loadedUrl) {
+  if (!imageUrl || !loadedUrl) return;
+  
+  const cacheKey = `img_cache_${btoa(imageUrl).substring(0, 100)}`;
+  try {
+    const cacheData = {
+      loaded: true,
+      expiry: Date.now() + (24 * 60 * 60 * 1000),
+      timestamp: Date.now()
+    };
+    
+    const dataSize = JSON.stringify(cacheData).length;
+    imageCacheSize += dataSize;
+    
+    if (imageCacheSize > IMAGE_CACHE_MAX_SIZE) {
+      cleanupImageCache();
+    }
+    
+    localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+  } catch (err) {
+    if (err.name === 'QuotaExceededError') {
+      cleanupImageCache();
+      try {
+        const cacheData = {
+          loaded: true,
+          expiry: Date.now() + (24 * 60 * 60 * 1000),
+          timestamp: Date.now()
+        };
+        localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+      } catch (retryErr) {
+        console.warn('Image cache full, skipping:', imageUrl);
+      }
+    } else {
+      console.error('Cache write error:', err);
+    }
+  }
+}
+
+function cleanupImageCache() {
+  try {
+    const keys = Object.keys(localStorage);
+    const cacheKeys = keys.filter(k => k.startsWith('img_cache_'));
+    const cacheEntries = cacheKeys.map(key => {
+      try {
+        const data = JSON.parse(localStorage.getItem(key));
+        return { key, expiry: data.expiry };
+      } catch {
+        return { key, expiry: 0 };
+      }
+    });
+    
+    cacheEntries.sort((a, b) => a.expiry - b.expiry);
+    
+    const toRemove = Math.floor(cacheEntries.length * 0.3);
+    for (let i = 0; i < toRemove; i++) {
+      localStorage.removeItem(cacheEntries[i].key);
+    }
+    
+    imageCacheSize = 0;
+  } catch (err) {
+    console.error('Cache cleanup error:', err);
+  }
+}
+
 function updateCurrentQuestionHighlight(oldNum, newNum) {
   const oldQuestion = form.querySelector(`#question-${oldNum}`);
   const newQuestion = form.querySelector(`#question-${newNum}`);
@@ -890,6 +1080,16 @@ function trackQuestionStates() {
 }
 
 async function loadQuestions(stationNumber) {
+  if (imageObserver) {
+    imageObserver.disconnect();
+    imageObserver = null;
+  }
+  
+  if (scrollUnloadHandler) {
+    window.removeEventListener('scroll', scrollUnloadHandler);
+    scrollUnloadHandler = null;
+  }
+  
   if (userCredentials.test) {
     if (!userIP) {
       await getUserIP();
@@ -1020,12 +1220,18 @@ async function loadQuestions(stationNumber) {
             handleImageLoad(img);
           }
         });
+        setupLazyImageLoading();
       }, 100);
 
       trackQuestionStates();
       restoreAnswers();
       setupScrollTracking();
       updateQuestionNavigation();
+      
+      scrollUnloadHandler = throttle(() => {
+        unloadDistantImages();
+      }, 500);
+      window.addEventListener('scroll', scrollUnloadHandler, { passive: true });
       isLoading = false;
       actionButton.disabled = false;
       actionButton.classList.remove("bg-primary", "text-inverse");
