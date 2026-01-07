@@ -50,10 +50,6 @@ function throttle(func, limit) {
 }
 
 function parseImagesInQuestion(questionText, questionNum) {
-  console.log(`parseImagesInQuestion called for question ${questionNum}`);
-  console.log(`Question text length: ${questionText?.length || 0}`);
-  console.log(`Question text preview: ${questionText?.substring(0, 200) || 'null/undefined'}`);
-  
   const dataUriPattern = /(data:image\/[^;]+;base64,[^\s<>"']+)/gi;
   // URL pattern with file extensions
   const urlPatternWithExt = /(https?:\/\/[^\s<>"']+\.(jpg|jpeg|png|gif|webp|svg|bmp)(\?[^\s<>"']*)?)/gi;
@@ -69,7 +65,6 @@ function parseImagesInQuestion(questionText, questionNum) {
   // Check if question already contains HTML img tags
   const hasImgTags = /<img[^>]*>/i.test(questionText);
   if (hasImgTags) {
-    console.log(`Question ${questionNum} already contains <img> tags, skipping image parsing`);
     return questionText;
   }
   
@@ -83,7 +78,6 @@ function parseImagesInQuestion(questionText, questionNum) {
   processedText = processedText.replace(dataUriPattern, (match) => {
     imageCounter++;
     const imageId = `img-${questionNum}-${Date.now()}-${imageCounter}`;
-    console.log(`Found base64 image in question ${questionNum}, creating image element`);
     return createImageHTML(match, imageId, questionNum, true);
   });
   
@@ -94,7 +88,6 @@ function parseImagesInQuestion(questionText, questionNum) {
   processedText = processedText.replace(urlPatternWithExt, (match) => {
     imageCounter++;
     const imageId = `img-${questionNum}-${Date.now()}-${imageCounter}`;
-    console.log(`Found URL image with extension in question ${questionNum}:`, match);
     return createImageHTML(match, imageId, questionNum, false);
   });
   
@@ -121,19 +114,12 @@ function parseImagesInQuestion(questionText, questionNum) {
       if (isStandaloneUrl || isLargeUrl) {
         imageCounter++;
         const imageId = `img-${questionNum}-${Date.now()}-${imageCounter}`;
-        console.log(`Treating URL as image in question ${questionNum}${isStandaloneUrl ? ' (standalone)' : ` (${Math.round(urlRatio*100)}% of text)`}:`, urlMatch);
         // Return image HTML - replace() preserves text before/after automatically
         return createImageHTML(urlMatch, imageId, questionNum, false);
       }
       // Return original URL if it doesn't meet criteria (preserves it in text)
       return urlMatch;
     });
-  }
-  
-  if (imageCounter === 0) {
-    console.log(`No images found in question ${questionNum}. Full text:`, questionText);
-  } else {
-    console.log(`Processed ${imageCounter} image(s) in question ${questionNum}`);
   }
   
   return processedText;
@@ -177,7 +163,6 @@ function createImageHTML(imageUrl, imageId, questionNum, isDataUri) {
 }
 
 function handleImageLoad(img) {
-  console.log('handleImageLoad called for image:', img.src?.substring(0, 50) || 'no src');
   img.style.display = 'block';
   const container = img.parentElement;
   const loading = container?.querySelector('.image-loading');
@@ -939,11 +924,9 @@ function setupLazyImageLoading() {
     // Check if this is a proxied URL
     if (dataSrc.startsWith('proxy:')) {
       const originalUrl = dataSrc.substring(6); // Remove 'proxy:' prefix
-      console.log('Loading image via proxy:', originalUrl);
       const base64Data = await loadImageViaProxy(originalUrl);
       
       if (base64Data) {
-        console.log('Proxy returned base64, setting image src');
         img.src = base64Data;
         img.removeAttribute('data-src');
         // onload/onerror handlers will handle display - no need for setTimeout check
@@ -1296,7 +1279,6 @@ async function loadQuestions(stationNumber) {
   fetch(`https://barry-proxy2.kimethan572.workers.dev?test=${userCredentials.test}&station=${stationNumber}`)
     .then(res => res.json())
     .then(data => {
-      console.log(`Loaded questions for station ${stationNumber}:`, data);
       if (!data.length) {
         form.innerHTML = '<div class="card"><p class="text-center">No questions found for this station.</p></div>';
         isLoading = false;
@@ -1305,7 +1287,6 @@ async function loadQuestions(stationNumber) {
       }
 
       currentQuestions = data;
-      console.log(`Processing ${data.length} questions`);
       
       const questionSavedState = loadTestState();
       if (questionSavedState && questionSavedState.currentStation === stationNumber) {
@@ -1338,13 +1319,6 @@ async function loadQuestions(stationNumber) {
 
       data.forEach((q, idx) => {
         const num = idx + 1;
-        console.log(`Processing question ${num}:`, {
-          hasQuestion: !!q.question,
-          questionType: typeof q.question,
-          questionLength: q.question?.length,
-          questionPreview: q.question?.substring(0, 100)
-        });
-        
         const div = document.createElement("div");
         div.classList.add("question");
         if (num === 1) {
