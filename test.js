@@ -11,7 +11,7 @@ const navStatsSkipped = document.getElementById("navStatsSkipped");
 const navStatsMarked = document.getElementById("navStatsMarked");
 
 const STATION_TIME = 120;
-const loadingThemes = ['barry-theme', 'bird-theme', 'lizard-theme', 'bug-theme', 'fossil-theme', 'rock-theme'];
+const loadingThemes = ['barry-theme', 'bird-theme', 'lizard-theme', 'fossil-theme', 'rock-theme'];
 
 let currentStation = 0;
 let totalStations = 0;
@@ -738,25 +738,6 @@ function getLoadingScreenHTML(theme) {
             <div class="lizard-leg back-left"></div>
             <div class="lizard-leg back-right"></div>
             <div class="lizard-tail"></div>
-          </div>
-        </div>
-      </div>
-      <div class="loading-message">Loading questions...</div>
-    `;
-  } else if (theme === 'bug-theme') {
-    return `
-      <div class="loading-bug">
-        <div class="bug">
-          <div class="bug-body">
-            <div class="bug-segment"></div>
-            <div class="bug-segment"></div>
-            <div class="bug-segment"></div>
-            <div class="bug-leg left"></div>
-            <div class="bug-leg left"></div>
-            <div class="bug-leg right"></div>
-            <div class="bug-leg right"></div>
-            <div class="bug-antenna left"></div>
-            <div class="bug-antenna right"></div>
           </div>
         </div>
       </div>
