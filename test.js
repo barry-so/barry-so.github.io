@@ -100,28 +100,12 @@ function parseImagesInQuestionSync(questionText, questionNum) {
     const imageId = `img-${questionNum}-${Date.now()}-${imageCounter}`;
     return createImageHTML(match, imageId, questionNum, false);
   });
-  
-  if (imageCounter === 0) {
-    processedText = processedText.replace(urlPatternPermissive, (urlMatch) => {
-      const urlLength = urlMatch.length;
-      const textLength = questionText.length;
-      const urlRatio = urlLength / textLength;
-      
-      const trimmedUrl = urlMatch.trim();
-      const trimmedText = questionText.trim();
-      const isStandaloneUrl = trimmedText === trimmedUrl || 
-                             new RegExp(`^\\s*${trimmedUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`, 'i').test(questionText);
-      const isLargeUrl = urlRatio >= 0.8;
-      
-      if (isStandaloneUrl || isLargeUrl) {
-        imageCounter++;
-        const imageId = `img-${questionNum}-${Date.now()}-${imageCounter}`;
-        return createImageHTML(urlMatch, imageId, questionNum, false);
-      }
-      return urlMatch;
-    });
-  }
-  
+
+  // NOTE: We intentionally no longer convert "generic" URLs (without an image
+  // extension) into images. This prevents non-image links like
+  // "https://barry-so.github.io/" from being treated as images, which caused
+  // handleImageError() logs when the proxy tried (and failed) to load them.
+
   return processedText;
 }
 
