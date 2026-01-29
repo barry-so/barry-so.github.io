@@ -294,10 +294,32 @@ function loadTestList() {
   if (!testSelect) return;
   
   fetch("https://barry-proxy2.kimethan572.workers.dev?action=listTests")
-    .then(res => res.json())
+    .then(async (res) => {
+      const contentType = res.headers.get('Content-Type') || '';
+
+      // If the response is not OK, log the body for debugging and throw
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        throw new Error(
+          `Failed to load tests. HTTP ${res.status} ${res.statusText}. ` +
+          (text ? `Body starts with: ${text.slice(0, 200)}` : '')
+        );
+      }
+
+      // Avoid "Unexpected token '<'" by checking the content type before json()
+      if (!contentType.includes('application/json')) {
+        const text = await res.text().catch(() => '');
+        throw new Error(
+          `Expected JSON but got "${contentType || 'unknown'}". ` +
+          (text ? `Body starts with: ${text.slice(0, 200)}` : '')
+        );
+      }
+
+      return res.json();
+    })
     .then(tests => {
       testSelect.innerHTML = "";
-      if (tests.length === 0) {
+      if (!Array.isArray(tests) || tests.length === 0) {
         testSelect.innerHTML = '<option value="">No tests available</option>';
         return;
       }
@@ -310,7 +332,7 @@ function loadTestList() {
     })
     .catch(err => {
       testSelect.innerHTML = '<option value="">Error loading tests</option>';
-      console.error(err);
+      console.error('Error loading tests:', err);
     });
 }
 
