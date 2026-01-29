@@ -53,13 +53,69 @@ function parseImagesInQuestion(questionText, questionNum) {
     const imageId = `img-${questionNum}-${Date.now()}-${imageCounter}`;
     return createImageHTML(match, imageId, questionNum, false);
   });
+  
+  // Fallback: treat certain standalone URLs as images, but avoid known non-image
+  // URLs (HTML pages, site root, local index, etc.) to prevent noisy errors.
+  if (imageCounter === 0) {
+    const urlPatternPermissive = /(https?:\/\/[^\s<>"']+)/gi;
 
-  // NOTE: We intentionally do NOT convert generic URLs (without an image
-  // extension) into images. This mirrors the main-thread parser and prevents
-  // non-image links like "https://barry-so.github.io/" from being treated as
-  // images, which was causing handleImageError() noise when the proxy failed
-  // to load them as images.
+    processedText = processedText.replace(urlPatternPermissive, (urlMatch) => {
+      const trimmedUrl = urlMatch.trim();
 
+      // Split trailing punctuation so we don't treat "index.html)" as a different URL
+      const urlPartsMatch = trimmedUrl.match(/^(https?:\/\/[^\s<>"']+?)([)\].,;!?]+)?$/i);
+      const urlCore = (urlPartsMatch?.[1] || trimmedUrl).trim();
+      const trailingPunctuation = urlPartsMatch?.[2] || '';
+
+      // Skip known non-image pages (site root / local dev index)
+      try {
+        const parsed = new URL(urlCore);
+        const isProdHost = parsed.hostname === 'barry-so.github.io';
+        const isLocalDev = (parsed.hostname === '127.0.0.1' || parsed.hostname === 'localhost') && parsed.port === '5500';
+        const isRootOrIndex = parsed.pathname === '/' || parsed.pathname === '/index.html';
+
+        if ((isProdHost && isRootOrIndex) || (isLocalDev && isRootOrIndex)) {
+          return urlMatch;
+        }
+      } catch {
+        // If URL parsing fails, fall through to checks below.
+      }
+
+      // If URL has a file extension that is clearly non-image (e.g. .html),
+      // don't treat it as an image.
+      try {
+        const parsed = new URL(urlCore);
+        const pathname = parsed.pathname || '';
+        const lastDot = pathname.lastIndexOf('.');
+        if (lastDot !== -1) {
+          const ext = pathname.slice(lastDot + 1).toLowerCase();
+          const nonImageExts = ['html', 'htm', 'php', 'asp', 'aspx', 'jsp'];
+          if (nonImageExts.includes(ext)) {
+            return urlMatch;
+          }
+        }
+      } catch {
+        // If URL parsing fails, fall through to ratio checks below.
+      }
+
+      const urlLength = urlCore.length;
+      const textLength = questionText.length;
+      const urlRatio = textLength ? (urlLength / textLength) : 0;
+      
+      const trimmedText = questionText.trim();
+      const isStandaloneUrl = trimmedText === urlCore || 
+                             new RegExp(`^\\s*${urlCore.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}\\s*$`, 'i').test(questionText);
+      const isLargeUrl = urlRatio >= 0.8;
+      
+      if (isStandaloneUrl || isLargeUrl) {
+        imageCounter++;
+        const imageId = `img-${questionNum}-${Date.now()}-${imageCounter}`;
+        return createImageHTML(urlCore, imageId, questionNum, false) + trailingPunctuation;
+      }
+      return urlMatch;
+    });
+  }
+  
   return processedText;
 }
 

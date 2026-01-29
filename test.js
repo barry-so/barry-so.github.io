@@ -11,7 +11,8 @@ const navStatsSkipped = document.getElementById("navStatsSkipped");
 const navStatsMarked = document.getElementById("navStatsMarked");
 
 const STATION_TIME = 120;
-const loadingThemes = ['barry-theme', 'bird-theme', 'lizard-theme', 'fossil-theme', 'rock-theme'];
+// Available loading themes (removed 'fossil-theme' per design change)
+const loadingThemes = ['barry-theme', 'bird-theme', 'lizard-theme', 'rock-theme'];
 
 let currentStation = 0;
 let totalStations = 0;
@@ -100,12 +101,67 @@ function parseImagesInQuestionSync(questionText, questionNum) {
     const imageId = `img-${questionNum}-${Date.now()}-${imageCounter}`;
     return createImageHTML(match, imageId, questionNum, false);
   });
+  
+  // Fallback: treat certain standalone URLs as images, but avoid known non-image
+  // URLs (HTML pages, site root, local index, etc.) to prevent noisy errors.
+  if (imageCounter === 0) {
+    processedText = processedText.replace(urlPatternPermissive, (urlMatch) => {
+      const trimmedUrl = urlMatch.trim();
 
-  // NOTE: We intentionally no longer convert "generic" URLs (without an image
-  // extension) into images. This prevents non-image links like
-  // "https://barry-so.github.io/" from being treated as images, which caused
-  // handleImageError() logs when the proxy tried (and failed) to load them.
+      // Split trailing punctuation so we don't treat "index.html)" as a different URL
+      const urlPartsMatch = trimmedUrl.match(/^(https?:\/\/[^\s<>"']+?)([)\].,;!?]+)?$/i);
+      const urlCore = (urlPartsMatch?.[1] || trimmedUrl).trim();
+      const trailingPunctuation = urlPartsMatch?.[2] || '';
 
+      // Skip known non-image pages (site root / local dev index)
+      try {
+        const parsed = new URL(urlCore);
+        const isProdHost = parsed.hostname === 'barry-so.github.io';
+        const isLocalDev = (parsed.hostname === '127.0.0.1' || parsed.hostname === 'localhost') && parsed.port === '5500';
+        const isRootOrIndex = parsed.pathname === '/' || parsed.pathname === '/index.html';
+
+        if ((isProdHost && isRootOrIndex) || (isLocalDev && isRootOrIndex)) {
+          return urlMatch;
+        }
+      } catch {
+        // If URL parsing fails, fall through to checks below.
+      }
+
+      // If URL has a file extension that is clearly non-image (e.g. .html),
+      // don't treat it as an image.
+      try {
+        const parsed = new URL(urlCore);
+        const pathname = parsed.pathname || '';
+        const lastDot = pathname.lastIndexOf('.');
+        if (lastDot !== -1) {
+          const ext = pathname.slice(lastDot + 1).toLowerCase();
+          const nonImageExts = ['html', 'htm', 'php', 'asp', 'aspx', 'jsp'];
+          if (nonImageExts.includes(ext)) {
+            return urlMatch;
+          }
+        }
+      } catch {
+        // If URL parsing fails, fall through to ratio checks below.
+      }
+
+      const urlLength = urlCore.length;
+      const textLength = questionText.length;
+      const urlRatio = textLength ? (urlLength / textLength) : 0;
+      
+      const trimmedText = questionText.trim();
+      const isStandaloneUrl = trimmedText === urlCore || 
+                             new RegExp(`^\\s*${urlCore.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}\\s*$`, 'i').test(questionText);
+      const isLargeUrl = urlRatio >= 0.8;
+      
+      if (isStandaloneUrl || isLargeUrl) {
+        imageCounter++;
+        const imageId = `img-${questionNum}-${Date.now()}-${imageCounter}`;
+        return createImageHTML(urlCore, imageId, questionNum, false) + trailingPunctuation;
+      }
+      return urlMatch;
+    });
+  }
+  
   return processedText;
 }
 
@@ -1029,41 +1085,9 @@ function setupLazyImageLoading() {
 }
 
 function unloadDistantImages() {
-  const allImages = form.querySelectorAll('.question-image');
-  if (allImages.length === 0) return;
-  
-  const viewportTop = window.scrollY;
-  const viewportBottom = viewportTop + window.innerHeight;
-  const unloadDistance = window.innerHeight * 3;
-
-  allImages.forEach(img => {
-    const rect = img.getBoundingClientRect();
-    const imageTop = viewportTop + rect.top;
-    const imageBottom = imageTop + rect.height;
-    
-    const isFarAbove = imageBottom < viewportTop - unloadDistance;
-    const isFarBelow = imageTop > viewportBottom + unloadDistance;
-    
-    if ((isFarAbove || isFarBelow) && img.src && !img.getAttribute('data-src')) {
-      const container = img.parentElement;
-      const imageUrl = container.getAttribute('data-image-url');
-      const isDataUri = container.getAttribute('data-is-data-uri') === 'true';
-      
-      if (!isDataUri && imageUrl && img.complete) {
-        img.src = '';
-        // Remove native lazy loading attribute when switching to custom lazy loading
-        img.removeAttribute('loading');
-        // Mark for proxy loading when it comes back into view
-        img.setAttribute('data-src', `proxy:${imageUrl}`);
-        img.style.display = 'none';
-        const loading = container.querySelector('.image-loading');
-        if (loading) loading.style.display = 'block';
-        if (imageObserver) {
-          imageObserver.observe(img);
-        }
-      }
-    }
-  });
+  // Image unloading for memory optimization has been disabled to prevent
+  // visible images from disappearing when the user scrolls. This function
+  // is intentionally left as a no-op.
 }
 
 function getCachedImageUrl(imageUrl, isDataUri) {
@@ -1490,7 +1514,9 @@ async function loadQuestions(stationNumber) {
       scrollUnloadHandler = throttle(() => {
         unloadDistantImages();
       }, 500);
-      window.addEventListener('scroll', scrollUnloadHandler, { passive: true });
+      // Automatic unloading of distant images has been disabled to avoid
+      // images disappearing while scrolling, so we no longer attach the
+      // scroll handler here.
       isLoading = false;
       actionButton.disabled = false;
       actionButton.classList.remove("bg-primary", "text-inverse");
@@ -1548,22 +1574,8 @@ function updateButtonState() {
 }
 
 function ensureButtonVisible() {
-  const buttonContainer = document.getElementById('actionButtonContainer');
-  if (buttonContainer && actionButton) {
-    const rect = buttonContainer.getBoundingClientRect();
-    const isVisible = (
-      rect.top >= 0 &&
-      rect.left >= 0 &&
-      rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
-      rect.right <= (window.innerWidth || document.documentElement.clientWidth)
-    );
-    
-    if (!isVisible) {
-      setTimeout(() => {
-        buttonContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }, 100);
-    }
-  }
+  // Automatic scroll-to-bottom has been disabled for better UX.
+  // This function is intentionally left as a no-op.
 }
 
 async function handleNextStation(isAutoAdvance=false) {
