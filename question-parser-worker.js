@@ -27,7 +27,6 @@ self.onmessage = function(e) {
 function parseImagesInQuestion(questionText, questionNum) {
   const dataUriPattern = /(data:image\/[^;]+;base64,[^\s<>"']+)/gi;
   const urlPatternWithExt = /(https?:\/\/[^\s<>"']+\.(jpg|jpeg|png|gif|webp|svg|bmp)(\?[^\s<>"']*)?)/gi;
-  const urlPatternPermissive = /(https?:\/\/[^\s<>"']+)/gi;
   
   if (!questionText || typeof questionText !== 'string') {
     return questionText || '';
@@ -54,29 +53,13 @@ function parseImagesInQuestion(questionText, questionNum) {
     const imageId = `img-${questionNum}-${Date.now()}-${imageCounter}`;
     return createImageHTML(match, imageId, questionNum, false);
   });
-  
-  // Check for URLs without extensions (only if no images found yet)
-  if (imageCounter === 0) {
-    processedText = processedText.replace(urlPatternPermissive, (urlMatch) => {
-      const urlLength = urlMatch.length;
-      const textLength = questionText.length;
-      const urlRatio = urlLength / textLength;
-      
-      const trimmedUrl = urlMatch.trim();
-      const trimmedText = questionText.trim();
-      const isStandaloneUrl = trimmedText === trimmedUrl || 
-                             new RegExp(`^\\s*${trimmedUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`, 'i').test(questionText);
-      const isLargeUrl = urlRatio >= 0.8;
-      
-      if (isStandaloneUrl || isLargeUrl) {
-        imageCounter++;
-        const imageId = `img-${questionNum}-${Date.now()}-${imageCounter}`;
-        return createImageHTML(urlMatch, imageId, questionNum, false);
-      }
-      return urlMatch;
-    });
-  }
-  
+
+  // NOTE: We intentionally do NOT convert generic URLs (without an image
+  // extension) into images. This mirrors the main-thread parser and prevents
+  // non-image links like "https://barry-so.github.io/" from being treated as
+  // images, which was causing handleImageError() noise when the proxy failed
+  // to load them as images.
+
   return processedText;
 }
 
