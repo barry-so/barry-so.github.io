@@ -102,8 +102,7 @@ function parseImagesInQuestionSync(questionText, questionNum) {
     return createImageHTML(match, imageId, questionNum, false);
   });
   
-  // Fallback: treat certain standalone URLs as images, but avoid known non-image
-  // URLs (HTML pages, site root, local index, etc.) to prevent noisy errors.
+  // FIXED: Improved URL detection for Bing images and other URLs yay
   if (imageCounter === 0) {
     processedText = processedText.replace(urlPatternPermissive, (urlMatch) => {
       const trimmedUrl = urlMatch.trim();
@@ -122,6 +121,33 @@ function parseImagesInQuestionSync(questionText, questionNum) {
 
         if ((isProdHost && isRootOrIndex) || (isLocalDev && isRootOrIndex)) {
           return urlMatch;
+        }
+        
+        // FIXED: Detect Bing image URLs and other image services
+        const hostname = parsed.hostname.toLowerCase();
+        const pathname = parsed.pathname.toLowerCase();
+        
+        // Known image service domains
+        const imageServiceDomains = [
+          'bing.net',
+          'bing.com',
+          'mm.bing.net',
+          'tse1.mm.bing.net',
+          'tse2.mm.bing.net',
+          'tse3.mm.bing.net',
+          'tse4.mm.bing.net',
+          'i.imgur.com',
+          'imgur.com',
+          'cdn.discordapp.com',
+          'media.discordapp.net'
+        ];
+        
+        const isImageService = imageServiceDomains.some(domain => hostname.includes(domain));
+        
+        if (isImageService) {
+          imageCounter++;
+          const imageId = `img-${questionNum}-${Date.now()}-${imageCounter}`;
+          return createImageHTML(urlCore, imageId, questionNum, false) + trailingPunctuation;
         }
       } catch {
         // If URL parsing fails, fall through to checks below.
@@ -1742,6 +1768,7 @@ async function handleNextStation(isAutoAdvance=false) {
   }
 }
 
+// FIXED: Improved showCompletionScreen function to ensure proper display
 function showCompletionScreen() {
   stopTimer();
   questionNav.style.display = "none";
@@ -1758,6 +1785,8 @@ function showCompletionScreen() {
   markTestCompleted(userCredentials.test);
   clearTestState();
   
+  // FIXED: Ensure the form container is properly cleared and reset
+  form.style.display = 'block';
   form.innerHTML = `
     <div class="card completion-screen text-center">
       <div class="completion-icon text-5xl mb-4">✓</div>
@@ -1777,15 +1806,23 @@ function showCompletionScreen() {
       </p>
     </div>
   `;
+  
+  // FIXED: Properly hide the button and clear other elements
   actionButton.style.display = "none";
+  actionButton.style.visibility = "hidden";
   timerEl.textContent = "";
-  stationTitle.textContent = "";
+  timerEl.style.display = "none";
+  stationTitle.textContent = "Test Complete";
   resultEl.textContent = "";
+  resultEl.style.display = "none";
   
   const outOfBrowserEl = document.getElementById('outOfBrowserTime');
   if (outOfBrowserEl) {
     outOfBrowserEl.style.display = "none";
   }
+  
+  // FIXED: Force a repaint to ensure the completion screen shows
+  form.offsetHeight; // Trigger reflow
 }
 
 async function submitStation(stationNumber, isFinal) {
