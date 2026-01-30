@@ -1826,6 +1826,11 @@ function showCompletionScreen() {
 }
 
 async function submitStation(stationNumber, isFinal) {
+  if (!userCredentials || !userCredentials.test) {
+    showSubmissionFailedScreen("Test identifier missing. Submission blocked.");
+    return;
+  }
+  
   if (isSubmitting) return;
   
   isSubmitting = true;
@@ -1864,6 +1869,8 @@ async function submitStation(stationNumber, isFinal) {
   data.append("email", userCredentials.email);
   data.append("station", stationNumber);
   data.append("test", userCredentials.test);
+  console.log("Submitting test:", userCredentials.test);
+
   if (isFinal) {
     data.append("final", "true");
     data.append("oobTime", totalOutOfBrowserTime.toString());
@@ -2038,6 +2045,11 @@ actionButton.addEventListener("click", () => {
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !actionButton.disabled && document.activeElement.tagName !== 'TEXTAREA') {
     if (currentStation === 0 || document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'SELECT') {
+      if (!document.getElementById("testSelect").value) {
+        resultEl.textContent = "Please select a test.";
+        resultEl.className = "text-center mt-6 text-error";
+        return;
+      }      
       return;
     }
   }
