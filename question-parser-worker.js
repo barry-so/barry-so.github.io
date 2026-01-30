@@ -54,8 +54,7 @@ function parseImagesInQuestion(questionText, questionNum) {
     return createImageHTML(match, imageId, questionNum, false);
   });
   
-  // Fallback: treat certain standalone URLs as images, but avoid known non-image
-  // URLs (HTML pages, site root, local index, etc.) to prevent noisy errors.
+  // FIXED: Improved fallback URL detection for Bing images and other image services
   if (imageCounter === 0) {
     const urlPatternPermissive = /(https?:\/\/[^\s<>"']+)/gi;
 
@@ -76,6 +75,32 @@ function parseImagesInQuestion(questionText, questionNum) {
 
         if ((isProdHost && isRootOrIndex) || (isLocalDev && isRootOrIndex)) {
           return urlMatch;
+        }
+        
+        // FIXED: Detect Bing image URLs and other image services
+        const hostname = parsed.hostname.toLowerCase();
+        
+        // Known image service domains
+        const imageServiceDomains = [
+          'bing.net',
+          'bing.com',
+          'mm.bing.net',
+          'tse1.mm.bing.net',
+          'tse2.mm.bing.net',
+          'tse3.mm.bing.net',
+          'tse4.mm.bing.net',
+          'i.imgur.com',
+          'imgur.com',
+          'cdn.discordapp.com',
+          'media.discordapp.net'
+        ];
+        
+        const isImageService = imageServiceDomains.some(domain => hostname.includes(domain));
+        
+        if (isImageService) {
+          imageCounter++;
+          const imageId = `img-${questionNum}-${Date.now()}-${imageCounter}`;
+          return createImageHTML(urlCore, imageId, questionNum, false) + trailingPunctuation;
         }
       } catch {
         // If URL parsing fails, fall through to checks below.
@@ -151,4 +176,3 @@ function createImageHTML(imageUrl, imageId, questionNum, isDataUri) {
       </div>`;
   }
 }
-
