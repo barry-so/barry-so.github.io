@@ -1872,8 +1872,20 @@ async function submitStation(stationNumber, isFinal) {
   new FormData(form).forEach((v,k) => data.append(k,v));
 
   fetch("https://barry-proxy2.kimethan572.workers.dev/", { method: "POST", body: data })
-    .then(res => res.json())
-    .then(() => {
+  .then(async res => {
+    const text = await res.text();
+  
+    if (!res.ok) {
+      throw new Error(text);
+    }
+  
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw new Error("Server returned invalid response");
+    }
+  })
+  .then(() => { 
       isSubmitting = false;
       if (isFinal) {
         showCompletionScreen();
